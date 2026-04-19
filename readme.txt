@@ -11,8 +11,9 @@
 INTRODUCTION:
 ------------
 
-Musashi is a Motorola 68000, 68010, 68EC020, 68020, 68EC030, 68030, 68EC040 and
-68040 emulator written in C.  This emulator was written with two goals in mind:
+Musashi is a Motorola M680x0 processor emulator written in C, supporting the
+68000, 68008, 68010, 68EC020, 68020, 68EC030, 68030, 68EC040, 68040, 68EC060,
+68LC060, and 68060.  This emulator was written with two goals in mind:
 portability and speed.
 
 The emulator is written to ANSI C89 specifications.  It also uses inline
@@ -219,10 +220,14 @@ To set the CPU type you want to use:
     M68K_EMULATE_010
     M68K_EMULATE_EC020
     M68K_EMULATE_020
+    M68K_EMULATE_030
+    M68K_EMULATE_040
+    M68K_EMULATE_060
 
 - In your host program, call m68k_set_cpu_type() and then call
   m68k_pulse_reset().  Valid CPU types are:
     M68K_CPU_TYPE_68000,
+    M68K_CPU_TYPE_68008,
     M68K_CPU_TYPE_68010,
     M68K_CPU_TYPE_68EC020,
     M68K_CPU_TYPE_68020,
@@ -230,7 +235,15 @@ To set the CPU type you want to use:
     M68K_CPU_TYPE_68030,
     M68K_CPU_TYPE_68EC040,
     M68K_CPU_TYPE_68040,
+    M68K_CPU_TYPE_68EC060,
+    M68K_CPU_TYPE_68LC060,
+    M68K_CPU_TYPE_68060,
     M68K_CPU_TYPE_SCC68070 (which is a 68010 with a 32 bit data bus).
+
+  Note: The 68060 removes hardware support for some 68020/030/040
+  instructions (e.g. 64-bit MULL/DIVL, CHK2/CMP2, CAS2).  These are
+  trapped as unimplemented integer instructions (vector 61) and can
+  be handled by a software emulation library in the exception handler.
 
 CLOCK FREQUENCY:
 ---------------
