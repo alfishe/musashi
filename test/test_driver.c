@@ -334,30 +334,53 @@ void setup_bootsec(void) {
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
-        printf("Usage: test_driver filename.bin\n");
+        printf("Usage: test_driver [--cpu=TYPE] filename.bin\n");
+        printf("  CPU types: 68000, 68010, 68020, 68030, 68040 (default),\n");
+        printf("             68060, 68lc060, 68ec060\n");
         return EXIT_FAILURE;
     }
 
+    int cpu_type = M68K_CPU_TYPE_68040;  /* default */
     int arg = 1;
+
+    /* Parse --cpu= flag */
+    while (arg < argc && strncmp(argv[arg], "--", 2) == 0) {
+        const char* a = argv[arg];
+        if (strncmp(a, "--cpu=", 6) == 0) {
+            const char* type = a + 6;
+            if (strcmp(type, "68000") == 0) cpu_type = M68K_CPU_TYPE_68000;
+            else if (strcmp(type, "68010") == 0) cpu_type = M68K_CPU_TYPE_68010;
+            else if (strcmp(type, "68020") == 0) cpu_type = M68K_CPU_TYPE_68020;
+            else if (strcmp(type, "68ec020") == 0) cpu_type = M68K_CPU_TYPE_68EC020;
+            else if (strcmp(type, "68030") == 0) cpu_type = M68K_CPU_TYPE_68030;
+            else if (strcmp(type, "68040") == 0) cpu_type = M68K_CPU_TYPE_68040;
+            else if (strcmp(type, "68lc040") == 0) cpu_type = M68K_CPU_TYPE_68LC040;
+            else if (strcmp(type, "68ec040") == 0) cpu_type = M68K_CPU_TYPE_68EC040;
+            else if (strcmp(type, "68060") == 0) cpu_type = M68K_CPU_TYPE_68060;
+            else if (strcmp(type, "68lc060") == 0) cpu_type = M68K_CPU_TYPE_68LC060;
+            else if (strcmp(type, "68ec060") == 0) cpu_type = M68K_CPU_TYPE_68EC060;
+            else {
+                printf("Unknown CPU type: %s\n", type);
+                return EXIT_FAILURE;
+            }
+        } else {
+            printf("Unknown option: %s\n", a);
+            return EXIT_FAILURE;
+        }
+        ++arg;
+    }
+
+    if (arg >= argc) {
+        printf("Error: no binary file specified\n");
+        return EXIT_FAILURE;
+    }
+
     FILE * infile = fopen(argv[arg], "rb");
     if (!infile) {
         printf("Cannot open: %s\n", argv[arg]);
         return EXIT_FAILURE;
     }
     arg++;
-
-    while (arg < argc) {
-        const char* a = argv[arg];
-
-        if (strncmp(a, "--", 2) != 0)
-            break;
-
-        // Other opts here
-
-        printf("Unknown option: %s\n", a);
-        return EXIT_FAILURE;
-        ++arg;
-    }
 
     // Parse FP test data - if requested
     if (arg < argc) {
@@ -377,7 +400,7 @@ int main(int argc, char* argv[]) {
     setup_bootsec();
 
     m68k_init();
-    m68k_set_cpu_type(M68K_CPU_TYPE_68040);
+    m68k_set_cpu_type(cpu_type);
     m68k_pulse_reset();
 
     for (int i = 0; i < 100; ++i) {

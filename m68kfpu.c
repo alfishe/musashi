@@ -1185,6 +1185,85 @@ static void fpgen_rm_reg(uint16 w2)
 	floatx80 source;
 	int round;
 
+	/* 68060 FPU trap check: must be BEFORE any EA reads to avoid side effects.
+	 * The 060 only implements a subset of FPU operations in hardware.
+	 * All others must trap to Vector 11 (F-line) for FPSP emulation.
+	 *
+	 * Hardware ops on 060 (from MC68060UM Table 1-5):
+	 *   FMOVE(0x00), FINT(0x01), FINTRZ(0x03), FSQRT(0x04/05),
+	 *   FABS(0x18/19/1A/1C/1D/1E), FNEG(0x1A..),
+	 *   FADD(0x22/23/26/27/2A/2B/2E/2F), FSUB(0x28/29/2C/2D),
+	 *   FMUL(0x23...), FDIV(0x20/21/24/25),
+	 *   FCMP(0x38), FTST(0x3A),
+	 *   FSMOVE(0x40), FDMOVE(0x44), single/double rounding variants
+	 * 
+	 * For simplicity we check a known-hardware-ops set.
+	 * FMOVECR (src==7, rm==0) is always trapped since 060 has no constant ROM.
+	 */
+	if (CPU_TYPE_IS_060_PLUS(CPU_TYPE))
+	{
+		/* FMOVECR: rm==1 and src==7 in the source switch */
+		if (rm && src == 7) {
+			m68ki_exception_1111();
+			return;
+		}
+
+		/* Check if this opmode is a hardware-supported operation on 060.
+		 * The 68060 implements these base operations plus their
+		 * single-precision (Fs*) and double-precision (Fd*) variants.
+		 * Ref: MC68060 User's Manual, Section 1.3 / Table 1-5.
+		 */
+		{
+			int is_hw = 0;
+
+			switch(opmode) {
+				/* Base operations (extended precision) */
+				case 0x00: /* FMOVE */
+				case 0x01: /* FINT */
+				case 0x03: /* FINTRZ */
+				case 0x04: /* FSQRT */
+				case 0x18: /* FABS */
+				case 0x1A: /* FNEG */
+				case 0x20: /* FDIV */
+				case 0x22: /* FADD */
+				case 0x23: /* FMUL */
+				case 0x28: /* FSUB */
+				case 0x38: /* FCMP */
+				case 0x3A: /* FTST */
+				/* Single-precision rounding variants */
+				case 0x40: /* FSMOVE */
+				case 0x41: /* FSSQRT */
+				case 0x44: /* FDMOVE */
+				case 0x45: /* FDSQRT */
+				case 0x58: /* FSABS */
+				case 0x5A: /* FSNEG */
+				case 0x5C: /* FDABS */
+				case 0x5E: /* FDNEG */
+				case 0x60: /* FSDIV */
+				case 0x62: /* FSADD */
+				case 0x63: /* FSMUL */
+				case 0x64: /* FDDIV */
+				case 0x66: /* FDADD */
+				case 0x67: /* FDMUL */
+				case 0x68: /* FSSUB */
+				case 0x6C: /* FDSUB */
+					is_hw = 1;
+					break;
+			}
+
+			if (!is_hw) {
+				m68ki_exception_1111();
+				return;
+			}
+		}
+
+		/* Packed decimal source (src==3, rm==1): always trap on 060 */
+		if (rm && src == 3) {
+			m68ki_exception_1111();
+			return;
+		}
+	}
+
 	// fmovecr #$f, fp0	f200 5c0f
 
 	if (rm)
@@ -1574,6 +1653,13 @@ static void fmove_reg_mem(uint16 w2)
 	int dst = (w2 >> 10) & 0x7;
 	int k = (w2 & 0x7f);
 
+	/* 68060: Packed decimal (dst 3 = static k, dst 7 = dynamic k) is
+	 * unimplemented — trap to F-line for FPSP emulation */
+	if (CPU_TYPE_IS_060_PLUS(CPU_TYPE) && (dst == 3 || dst == 7)) {
+		m68ki_exception_1111();
+		return;
+	}
+
 	switch (dst)
 	{
 		case 0:		// Long-Word Integer
@@ -1637,6 +1723,12 @@ static void fmove_fpcr(uint16 w2)
 	int ea = REG_IR & 0x3f;
 	int dir = (w2 >> 13) & 0x1;
 	int reg = (w2 >> 10) & 0x7;
+
+	/* 68060: FPIAR (bit 0 of register list) is unimplemented */
+	if (CPU_TYPE_IS_060_PLUS(CPU_TYPE) && (reg & 1)) {
+		m68ki_exception_1111();
+		return;
+	}
 
 	if (dir)	// From system control reg to <ea>
 	{

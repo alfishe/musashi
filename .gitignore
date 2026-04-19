@@ -26,3 +26,5 @@ m68kops.?
 sim
 tags
 test_driver
+*.dSYM/
+test/mc68060/*.bin

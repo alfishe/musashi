@@ -84,6 +84,10 @@
 #define M68K_EMULATE_040            M68K_OPT_ON
 #endif
 
+#ifndef M68K_EMULATE_060
+#define M68K_EMULATE_060            M68K_OPT_ON
+#endif
+
 
 /* If ON, the CPU will call m68k_read_immediate_xx() for immediate addressing
  * and m68k_read_pcrelative_xx() for PC-relative addressing.

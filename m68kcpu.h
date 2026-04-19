@@ -168,6 +168,8 @@ typedef uint32 uint64;
 #define EXCEPTION_SPURIOUS_INTERRUPT      24
 #define EXCEPTION_INTERRUPT_AUTOVECTOR    24
 #define EXCEPTION_TRAP_BASE               32
+#define EXCEPTION_UNIMPLEMENTED_FP        60  /* 68060: Unimplemented FP data type/force to line-F */
+#define EXCEPTION_UNIMPLEMENTED_INTEGER   61  /* 68060: Unimplemented Integer Instruction */
 
 /* Function codes set by CPU during data/address bus activity */
 #define FUNCTION_CODE_USER_DATA          1
@@ -188,6 +190,9 @@ typedef uint32 uint64;
 #define CPU_TYPE_LC040  (0x00000100)
 #define CPU_TYPE_040    (0x00000200)
 #define CPU_TYPE_SCC070 (0x00000400)
+#define CPU_TYPE_EC060  (0x00000800)
+#define CPU_TYPE_LC060  (0x00001000)
+#define CPU_TYPE_060    (0x00002000)
 
 /* Different ways to stop the CPU */
 #define STOP_LEVEL_STOP 1
@@ -383,8 +388,20 @@ typedef uint32 uint64;
 #define CYC_SHIFT        m68ki_cpu.cyc_shift
 #define CYC_RESET        m68ki_cpu.cyc_reset
 #define HAS_PMMU	 m68ki_cpu.has_pmmu
+#define HAS_FPU		 m68ki_cpu.has_fpu
 #define PMMU_ENABLED	 m68ki_cpu.pmmu_enabled
 #define RESET_CYCLES	 m68ki_cpu.reset_cycles
+#define REG_PCR		 m68ki_cpu.pcr
+#define REG_BUSCR	 m68ki_cpu.buscr
+
+/* 040/060 MMU registers (accessed via MOVEC) */
+#define REG_MMU_TC	 m68ki_cpu.mmu040_tc
+#define REG_ITT0	 m68ki_cpu.mmu040_itt0
+#define REG_ITT1	 m68ki_cpu.mmu040_itt1
+#define REG_DTT0	 m68ki_cpu.mmu040_dtt0
+#define REG_DTT1	 m68ki_cpu.mmu040_dtt1
+#define REG_URP		 m68ki_cpu.mmu040_urp
+#define REG_SRP		 m68ki_cpu.mmu040_srp
 
 
 #define CALLBACK_INT_ACK     m68ki_cpu.int_ack_callback
@@ -406,8 +423,16 @@ typedef uint32 uint64;
 /* These defines are dependant on the configuration defines in m68kconf.h */
 
 /* Disable certain comparisons if we're not using all CPU types */
+#if M68K_EMULATE_060
+#define CPU_TYPE_IS_060_PLUS(A)    ((A) & (CPU_TYPE_060 | CPU_TYPE_EC060 | CPU_TYPE_LC060))
+#define CPU_TYPE_IS_060_LESS(A)    1
+#else
+#define CPU_TYPE_IS_060_PLUS(A)    0
+#define CPU_TYPE_IS_060_LESS(A)    1
+#endif
+
 #if M68K_EMULATE_040
-#define CPU_TYPE_IS_040_PLUS(A)    ((A) & (CPU_TYPE_040 | CPU_TYPE_EC040))
+#define CPU_TYPE_IS_040_PLUS(A)    ((A) & (CPU_TYPE_040 | CPU_TYPE_EC040 | CPU_TYPE_060 | CPU_TYPE_EC060 | CPU_TYPE_LC060))
 	#define CPU_TYPE_IS_040_LESS(A)    1
 #else
 	#define CPU_TYPE_IS_040_PLUS(A)    0
@@ -415,7 +440,7 @@ typedef uint32 uint64;
 #endif
 
 #if M68K_EMULATE_030
-#define CPU_TYPE_IS_030_PLUS(A)    ((A) & (CPU_TYPE_030 | CPU_TYPE_EC030 | CPU_TYPE_040 | CPU_TYPE_EC040))
+#define CPU_TYPE_IS_030_PLUS(A)    ((A) & (CPU_TYPE_030 | CPU_TYPE_EC030 | CPU_TYPE_040 | CPU_TYPE_EC040 | CPU_TYPE_060 | CPU_TYPE_EC060 | CPU_TYPE_LC060))
 #define CPU_TYPE_IS_030_LESS(A)    1
 #else
 #define CPU_TYPE_IS_030_PLUS(A)	0
@@ -423,7 +448,7 @@ typedef uint32 uint64;
 #endif
 
 #if M68K_EMULATE_020
-#define CPU_TYPE_IS_020_PLUS(A)    ((A) & (CPU_TYPE_020 | CPU_TYPE_030 | CPU_TYPE_EC030 | CPU_TYPE_040 | CPU_TYPE_EC040))
+#define CPU_TYPE_IS_020_PLUS(A)    ((A) & (CPU_TYPE_020 | CPU_TYPE_030 | CPU_TYPE_EC030 | CPU_TYPE_040 | CPU_TYPE_EC040 | CPU_TYPE_060 | CPU_TYPE_EC060 | CPU_TYPE_LC060))
 	#define CPU_TYPE_IS_020_LESS(A)    1
 #else
 	#define CPU_TYPE_IS_020_PLUS(A)    0
@@ -431,7 +456,7 @@ typedef uint32 uint64;
 #endif
 
 #if M68K_EMULATE_EC020
-#define CPU_TYPE_IS_EC020_PLUS(A)  ((A) & (CPU_TYPE_EC020 | CPU_TYPE_020 | CPU_TYPE_030 | CPU_TYPE_EC030 | CPU_TYPE_040 | CPU_TYPE_EC040))
+#define CPU_TYPE_IS_EC020_PLUS(A)  ((A) & (CPU_TYPE_EC020 | CPU_TYPE_020 | CPU_TYPE_030 | CPU_TYPE_EC030 | CPU_TYPE_040 | CPU_TYPE_EC040 | CPU_TYPE_060 | CPU_TYPE_EC060 | CPU_TYPE_LC060))
 	#define CPU_TYPE_IS_EC020_LESS(A)  ((A) & (CPU_TYPE_000 | CPU_TYPE_010 | CPU_TYPE_EC020))
 #else
 	#define CPU_TYPE_IS_EC020_PLUS(A)  CPU_TYPE_IS_020_PLUS(A)
@@ -440,7 +465,7 @@ typedef uint32 uint64;
 
 #if M68K_EMULATE_010
 	#define CPU_TYPE_IS_010(A)         ((A) == CPU_TYPE_010)
-#define CPU_TYPE_IS_010_PLUS(A)    ((A) & (CPU_TYPE_010 | CPU_TYPE_EC020 | CPU_TYPE_020 | CPU_TYPE_EC030 | CPU_TYPE_030 | CPU_TYPE_040 | CPU_TYPE_EC040))
+#define CPU_TYPE_IS_010_PLUS(A)    ((A) & (CPU_TYPE_010 | CPU_TYPE_EC020 | CPU_TYPE_020 | CPU_TYPE_EC030 | CPU_TYPE_030 | CPU_TYPE_040 | CPU_TYPE_EC040 | CPU_TYPE_060 | CPU_TYPE_EC060 | CPU_TYPE_LC060))
 #define CPU_TYPE_IS_010_LESS(A)    ((A) & (CPU_TYPE_000 | CPU_TYPE_008 | CPU_TYPE_010))
 #else
 	#define CPU_TYPE_IS_010(A)         0
@@ -973,8 +998,11 @@ typedef struct
 	uint instr_mode;   /* Stores whether we are in instruction mode or group 0/1 exception mode */
 	uint run_mode;     /* Stores whether we are processing a reset, bus error, address error, or something else */
 	int    has_pmmu;     /* Indicates if a PMMU available (yes on 030, 040, no on EC030) */
+	int    has_fpu;      /* Indicates if an FPU is available (no on LC/EC variants) */
 	int    pmmu_enabled; /* Indicates if the PMMU is enabled */
 	int    fpu_just_reset; /* Indicates the FPU was just reset */
+	uint   pcr;          /* Processor Configuration Register (68060) */
+	uint   buscr;        /* Bus Control Register (68060) */
 	uint reset_cycles;
 
 	/* Clocks required for instructions / exceptions */
@@ -992,11 +1020,20 @@ typedef struct
 	uint virq_state;
 	uint nmi_pending;
 
-	/* PMMU registers */
+	/* PMMU registers (030-style) */
 	uint mmu_crp_aptr, mmu_crp_limit;
 	uint mmu_srp_aptr, mmu_srp_limit;
 	uint mmu_tc;
 	uint16 mmu_sr;
+
+	/* 040/060 MMU registers (accessed via MOVEC) */
+	uint mmu040_tc;
+	uint mmu040_itt0;
+	uint mmu040_itt1;
+	uint mmu040_dtt0;
+	uint mmu040_dtt1;
+	uint mmu040_urp;
+	uint mmu040_srp;
 
 	const uint8* cyc_instruction;
 	const uint8* cyc_exception;
@@ -2006,6 +2043,24 @@ static inline void m68ki_exception_1111(void)
 
 	/* Use up some clock cycles and undo the instruction's cycles */
 	USE_CYCLES(CYC_EXCEPTION[EXCEPTION_1111] - CYC_INSTRUCTION[REG_IR]);
+}
+
+/* Exception for 68060 Unimplemented Integer Instruction (Vector 61) */
+/* Used for MOVEP, CAS2, CHK2, CMP2, 64-bit MULL/DIVL */
+static inline void m68ki_exception_unimplemented_integer(void)
+{
+	uint sr;
+
+	sr = m68ki_init_exception();
+
+	/* Reuse existing Format $0 (4-word) stack frame.
+	 * REG_PPC points to the start of the trapping instruction
+	 * so the ISP handler can decode and emulate it.
+	 */
+	m68ki_stack_frame_0000(REG_PPC, sr, EXCEPTION_UNIMPLEMENTED_INTEGER);
+	m68ki_jump_vector(EXCEPTION_UNIMPLEMENTED_INTEGER);
+
+	USE_CYCLES(CYC_EXCEPTION[EXCEPTION_UNIMPLEMENTED_INTEGER] - CYC_INSTRUCTION[REG_IR]);
 }
 
 #if M68K_ILLG_HAS_CALLBACK == M68K_OPT_SPECIFY_HANDLER

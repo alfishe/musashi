@@ -58,6 +58,29 @@ TESTS_68040_RUN = $(TESTS_68040:%=%.bin)
 $(TESTS_68040_RUN): test_driver$(EXE)
 	./test_driver$(EXE) test/mc68040/$@
 
+TESTS_68060 = movep_trap cas2_trap chk2_cmp2_trap mull_64_trap divl_64_trap \
+	movec_pcr movec_cacr_mask movec_buscr pcr_write_mask mmusr_trap \
+	fsin_trap fadd_exec fmovecr_trap fpiar_trap packed_trap \
+	fpu_hw_ops fpu_sw_traps fpu_rounding_ops \
+	ptest_trap plpa_exec lpstop_exec \
+	mmu_regs
+
+TESTS_68060_RUN = $(TESTS_68060:%=%.060.bin)
+$(TESTS_68060_RUN): test_driver$(EXE)
+	./test_driver$(EXE) --cpu=68060 test/mc68060/$(patsubst %.060.bin,%.bin,$@)
+
+# LC060 tests run with --cpu=68lc060 (no FPU variant)
+TESTS_LC060 = lc060_fpu_trap lc060_pcr
+TESTS_LC060_RUN = $(TESTS_LC060:%=%.lc060.bin)
+$(TESTS_LC060_RUN): test_driver$(EXE)
+	./test_driver$(EXE) --cpu=68lc060 test/mc68060/$(patsubst %.lc060.bin,%.bin,$@)
+
+# EC060 tests run with --cpu=68ec060 (no FPU/MMU variant)
+TESTS_EC060 = ec060_pcr
+TESTS_EC060_RUN = $(TESTS_EC060:%=%.ec060.bin)
+$(TESTS_EC060_RUN): test_driver$(EXE)
+	./test_driver$(EXE) --cpu=68ec060 test/mc68060/$(patsubst %.ec060.bin,%.bin,$@)
+
 build_tests:
 	@$(MAKE) -C test all
-test: $(TESTS_68000_RUN) $(TESTS_68040_RUN)
+test: $(TESTS_68000_RUN) $(TESTS_68040_RUN) $(TESTS_68060_RUN) $(TESTS_LC060_RUN) $(TESTS_EC060_RUN)

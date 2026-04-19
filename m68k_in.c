@@ -911,6 +911,23 @@ M68KMAKE_OP(1010, 0, ., .)
 
 M68KMAKE_OP(1111, 0, ., .)
 {
+	/* 68060: PLPA instruction — Translate Logical to Physical Address
+	 * PLPAW (An): 1111 0101 0001 1rrr  ($F518+An)
+	 * PLPAR (An): 1111 0101 0100 1rrr  ($F548+An)
+	 * Note: PLPAW with A0 ($F518) is dispatched to the pflush handler
+	 * due to the opcode table entry, but A1-A7 ($F519-$F51F) end up here.
+	 * Without a full MMU implementation, PLPA is effectively a no-op
+	 * (logical address == physical address). */
+	if (CPU_TYPE_IS_060_PLUS(CPU_TYPE))
+	{
+		uint16 ir = REG_IR;
+		if ((ir & 0xFFF8) == 0xF548 || (ir & 0xFFF8) == 0xF518)
+		{
+			USE_CYCLES(4);
+			return;
+		}
+	}
+
 	m68ki_exception_1111();
 }
 
@@ -919,6 +936,11 @@ M68KMAKE_OP(040fpu0, 32, ., .)
 {
 	if(CPU_TYPE_IS_030_PLUS(CPU_TYPE))
 	{
+		/* Guard for FPU-less variants (LC040, EC040, LC060, EC060) */
+		if (!HAS_FPU) {
+			m68ki_exception_1111();
+			return;
+		}
 		m68040_fpu_op0();
 		return;
 	}
@@ -930,6 +952,10 @@ M68KMAKE_OP(040fpu1, 32, ., .)
 {
 	if(CPU_TYPE_IS_030_PLUS(CPU_TYPE))
 	{
+		if (!HAS_FPU) {
+			m68ki_exception_1111();
+			return;
+		}
 		m68040_fpu_op1();
 		return;
 	}
@@ -3348,6 +3374,11 @@ M68KMAKE_OP(cas2, 16, ., .)
 {
 	if(CPU_TYPE_IS_EC020_PLUS(CPU_TYPE))
 	{
+		/* 68060: CAS2 is unimplemented — trap to Vector 61 */
+		if(CPU_TYPE_IS_060_PLUS(CPU_TYPE)) {
+			m68ki_exception_unimplemented_integer();
+			return;
+		}
 		uint word2 = OPER_I_32();
 		uint* compare1 = &REG_D[(word2 >> 16) & 7];
 		uint ea1 = REG_DA[(word2 >> 28) & 15];
@@ -3393,6 +3424,11 @@ M68KMAKE_OP(cas2, 32, ., .)
 {
 	if(CPU_TYPE_IS_EC020_PLUS(CPU_TYPE))
 	{
+		/* 68060: CAS2 is unimplemented — trap to Vector 61 */
+		if(CPU_TYPE_IS_060_PLUS(CPU_TYPE)) {
+			m68ki_exception_unimplemented_integer();
+			return;
+		}
 		uint word2 = OPER_I_32();
 		uint* compare1 = &REG_D[(word2 >> 16) & 7];
 		uint ea1 = REG_DA[(word2 >> 28) & 15];
@@ -3520,6 +3556,11 @@ M68KMAKE_OP(chk2cmp2, 8, ., pcdi)
 {
 	if(CPU_TYPE_IS_EC020_PLUS(CPU_TYPE))
 	{
+		/* 68060: CHK2/CMP2 is unimplemented — trap to Vector 61 */
+		if(CPU_TYPE_IS_060_PLUS(CPU_TYPE)) {
+			m68ki_exception_unimplemented_integer();
+			return;
+		}
 		uint word2 = OPER_I_16();
 		sint compare = REG_DA[(word2 >> 12) & 15]&0xff;
 		uint ea = EA_PCDI_8();
@@ -3547,6 +3588,11 @@ M68KMAKE_OP(chk2cmp2, 8, ., pcix)
 {
 	if(CPU_TYPE_IS_EC020_PLUS(CPU_TYPE))
 	{
+		/* 68060: CHK2/CMP2 is unimplemented — trap to Vector 61 */
+		if(CPU_TYPE_IS_060_PLUS(CPU_TYPE)) {
+			m68ki_exception_unimplemented_integer();
+			return;
+		}
 		uint word2 = OPER_I_16();
 		sint compare = REG_DA[(word2 >> 12) & 15]&0xff;
 		uint ea = EA_PCIX_8();
@@ -3572,6 +3618,11 @@ M68KMAKE_OP(chk2cmp2, 8, ., .)
 {
 	if(CPU_TYPE_IS_EC020_PLUS(CPU_TYPE))
 	{
+		/* 68060: CHK2/CMP2 is unimplemented — trap to Vector 61 */
+		if(CPU_TYPE_IS_060_PLUS(CPU_TYPE)) {
+			m68ki_exception_unimplemented_integer();
+			return;
+		}
 		uint word2 = OPER_I_16();
 		sint compare = REG_DA[(word2 >> 12) & 15]&0xff;
 		uint ea = M68KMAKE_GET_EA_AY_8;
@@ -3597,6 +3648,11 @@ M68KMAKE_OP(chk2cmp2, 16, ., pcdi)
 {
 	if(CPU_TYPE_IS_EC020_PLUS(CPU_TYPE))
 	{
+		/* 68060: CHK2/CMP2 is unimplemented — trap to Vector 61 */
+		if(CPU_TYPE_IS_060_PLUS(CPU_TYPE)) {
+			m68ki_exception_unimplemented_integer();
+			return;
+		}
 		uint word2 = OPER_I_16();
 		sint compare = REG_DA[(word2 >> 12) & 15]&0xffff;
 		uint ea = EA_PCDI_16();
@@ -3621,6 +3677,11 @@ M68KMAKE_OP(chk2cmp2, 16, ., pcix)
 {
 	if(CPU_TYPE_IS_EC020_PLUS(CPU_TYPE))
 	{
+		/* 68060: CHK2/CMP2 is unimplemented — trap to Vector 61 */
+		if(CPU_TYPE_IS_060_PLUS(CPU_TYPE)) {
+			m68ki_exception_unimplemented_integer();
+			return;
+		}
 		uint word2 = OPER_I_16();
 		sint compare = REG_DA[(word2 >> 12) & 15]&0xffff;
 		uint ea = EA_PCIX_16();
@@ -3645,6 +3706,11 @@ M68KMAKE_OP(chk2cmp2, 16, ., .)
 {
 	if(CPU_TYPE_IS_EC020_PLUS(CPU_TYPE))
 	{
+		/* 68060: CHK2/CMP2 is unimplemented — trap to Vector 61 */
+		if(CPU_TYPE_IS_060_PLUS(CPU_TYPE)) {
+			m68ki_exception_unimplemented_integer();
+			return;
+		}
 		uint word2 = OPER_I_16();
 		sint compare = REG_DA[(word2 >> 12) & 15]&0xffff;
 		uint ea = M68KMAKE_GET_EA_AY_16;
@@ -3669,6 +3735,11 @@ M68KMAKE_OP(chk2cmp2, 32, ., pcdi)
 {
 	if(CPU_TYPE_IS_EC020_PLUS(CPU_TYPE))
 	{
+		/* 68060: CHK2/CMP2 is unimplemented — trap to Vector 61 */
+		if(CPU_TYPE_IS_060_PLUS(CPU_TYPE)) {
+			m68ki_exception_unimplemented_integer();
+			return;
+		}
 		uint word2 = OPER_I_16();
 		sint compare = REG_DA[(word2 >> 12) & 15];
 		uint ea = EA_PCDI_32();
@@ -3691,6 +3762,11 @@ M68KMAKE_OP(chk2cmp2, 32, ., pcix)
 {
 	if(CPU_TYPE_IS_EC020_PLUS(CPU_TYPE))
 	{
+		/* 68060: CHK2/CMP2 is unimplemented — trap to Vector 61 */
+		if(CPU_TYPE_IS_060_PLUS(CPU_TYPE)) {
+			m68ki_exception_unimplemented_integer();
+			return;
+		}
 		uint word2 = OPER_I_16();
 		sint compare = REG_DA[(word2 >> 12) & 15];
 		uint ea = EA_PCIX_32();
@@ -3713,6 +3789,11 @@ M68KMAKE_OP(chk2cmp2, 32, ., .)
 {
 	if(CPU_TYPE_IS_EC020_PLUS(CPU_TYPE))
 	{   
+		/* 68060: CHK2/CMP2 is unimplemented — trap to Vector 61 */
+		if(CPU_TYPE_IS_060_PLUS(CPU_TYPE)) {
+			m68ki_exception_unimplemented_integer();
+			return;
+		}
 		uint word2 = OPER_I_16();
 		// JFF changed the logic. chk2/cmp2 uses signed values, not unsigned
 		sint compare = REG_DA[(word2 >> 12) & 15];
@@ -4273,6 +4354,33 @@ M68KMAKE_OP(cpdbcc, 32, ., .)
 
 M68KMAKE_OP(cpgen, 32, ., .)
 {
+	/* 68060: LPSTOP — Low-Power Stop
+	 * Encoding: $F800 $01C0 imm16
+	 * The opcode $F800 matches the cpgen mask (0xF1C0/0xF000), so
+	 * LPSTOP is dispatched here rather than to the 1111 handler.
+	 * Supervisor only. Loads SR then halts the processor. */
+	if (CPU_TYPE_IS_060_PLUS(CPU_TYPE) && REG_IR == 0xF800)
+	{
+		uint16 ext = OPER_I_16();
+		if (ext == 0x01C0)
+		{
+			if (FLAG_S)
+			{
+				uint new_sr = OPER_I_16();
+				CPU_STOPPED |= STOP_LEVEL_STOP;
+				FLAG_INT_MASK = new_sr & 0x0700;
+				m68ki_set_ccr(new_sr);
+				SET_CYCLES(0);
+				return;
+			}
+			m68ki_exception_privilege_violation();
+			return;
+		}
+		/* ext != 0x01C0: fall through to F-line trap */
+		m68ki_exception_1111();
+		return;
+	}
+
 	if(CPU_TYPE_IS_EC020_PLUS(CPU_TYPE))
 	{
 		M68K_DO_LOG((M68K_LOG_FILEHANDLE "%s at %08x: called unimplemented instruction %04x (%s)\n",
@@ -4498,6 +4606,13 @@ M68KMAKE_OP(divl, 32, ., d)
 	if(CPU_TYPE_IS_EC020_PLUS(CPU_TYPE))
 	{
 		uint word2 = OPER_I_16();
+
+		/* 68060: 64-bit DIVL (Dh:Dl form) is unimplemented — trap to Vector 61.
+		 * 32-bit DIVL executes natively on 060. BIT_A = 64-bit flag. */
+		if(CPU_TYPE_IS_060_PLUS(CPU_TYPE) && BIT_A(word2)) {
+			m68ki_exception_unimplemented_integer();
+			return;
+		}
 		uint64 divisor   = DY;
 		uint64 dividend  = 0;
 		uint64 quotient  = 0;
@@ -4566,6 +4681,13 @@ M68KMAKE_OP(divl, 32, ., d)
 	if(CPU_TYPE_IS_EC020_PLUS(CPU_TYPE))
 	{
 		uint word2 = OPER_I_16();
+
+		/* 68060: 64-bit DIVL (Dh:Dl form) is unimplemented — trap to Vector 61.
+		 * 32-bit DIVL executes natively on 060. BIT_A = 64-bit flag. */
+		if(CPU_TYPE_IS_060_PLUS(CPU_TYPE) && BIT_A(word2)) {
+			m68ki_exception_unimplemented_integer();
+			return;
+		}
 		uint divisor = DY;
 		uint dividend_hi = REG_D[word2 & 7];
 		uint dividend_lo = REG_D[(word2 >> 12) & 7];
@@ -4709,6 +4831,13 @@ M68KMAKE_OP(divl, 32, ., .)
 	if(CPU_TYPE_IS_EC020_PLUS(CPU_TYPE))
 	{
 		uint word2 = OPER_I_16();
+
+		/* 68060: 64-bit DIVL (Dh:Dl form) is unimplemented — trap to Vector 61.
+		 * 32-bit DIVL executes natively on 060. BIT_A = 64-bit flag. */
+		if(CPU_TYPE_IS_060_PLUS(CPU_TYPE) && BIT_A(word2)) {
+			m68ki_exception_unimplemented_integer();
+			return;
+		}
 		uint64 divisor = M68KMAKE_GET_OPER_AY_32;
 		uint64 dividend  = 0;
 		uint64 quotient  = 0;
@@ -4777,6 +4906,13 @@ M68KMAKE_OP(divl, 32, ., .)
 	if(CPU_TYPE_IS_EC020_PLUS(CPU_TYPE))
 	{
 		uint word2 = OPER_I_16();
+
+		/* 68060: 64-bit DIVL (Dh:Dl form) is unimplemented — trap to Vector 61.
+		 * 32-bit DIVL executes natively on 060. BIT_A = 64-bit flag. */
+		if(CPU_TYPE_IS_060_PLUS(CPU_TYPE) && BIT_A(word2)) {
+			m68ki_exception_unimplemented_integer();
+			return;
+		}
 		uint divisor = M68KMAKE_GET_OPER_AY_32;
 		uint dividend_hi = REG_D[word2 & 7];
 		uint dividend_lo = REG_D[(word2 >> 12) & 7];
@@ -6707,6 +6843,7 @@ M68KMAKE_OP(movec, 32, cr, .)
 		{
 			uint word2 = OPER_I_16();
 
+
 			m68ki_trace_t0();		   /* auto-disable (see m68kcpu.h) */
 			switch (word2 & 0xfff)
 			{
@@ -6722,6 +6859,22 @@ M68KMAKE_OP(movec, 32, cr, .)
 					REG_DA[(word2 >> 12) & 15] = REG_CACR;
 					return;
 				}
+				return;
+			case 0x808:			   /* PCR (68060) */
+				if(CPU_TYPE_IS_060_PLUS(CPU_TYPE))
+				{
+					REG_DA[(word2 >> 12) & 15] = REG_PCR;
+					return;
+				}
+				m68ki_exception_illegal();
+				return;
+			case 0x008:			   /* BUSCR (68060) */
+				if(CPU_TYPE_IS_060_PLUS(CPU_TYPE))
+				{
+					REG_DA[(word2 >> 12) & 15] = REG_BUSCR;
+					return;
+				}
+				m68ki_exception_illegal();
 				return;
 			case 0x800:			   /* USP */
 				REG_DA[(word2 >> 12) & 15] = REG_USP;
@@ -6756,7 +6909,7 @@ M68KMAKE_OP(movec, 32, cr, .)
 			case 0x003:				/* TC */
 				if(CPU_TYPE_IS_040_PLUS(CPU_TYPE))
 				{
-					/* TODO */
+					REG_DA[(word2 >> 12) & 15] = REG_MMU_TC;
 					return;
 				}
 				m68ki_exception_illegal();
@@ -6764,7 +6917,7 @@ M68KMAKE_OP(movec, 32, cr, .)
 			case 0x004:				/* ITT0 */
 				if(CPU_TYPE_IS_040_PLUS(CPU_TYPE))
 				{
-					/* TODO */
+					REG_DA[(word2 >> 12) & 15] = REG_ITT0;
 					return;
 				}
 				m68ki_exception_illegal();
@@ -6772,7 +6925,7 @@ M68KMAKE_OP(movec, 32, cr, .)
 			case 0x005:				/* ITT1 */
 				if(CPU_TYPE_IS_040_PLUS(CPU_TYPE))
 				{
-					/* TODO */
+					REG_DA[(word2 >> 12) & 15] = REG_ITT1;
 					return;
 				}
 				m68ki_exception_illegal();
@@ -6780,7 +6933,7 @@ M68KMAKE_OP(movec, 32, cr, .)
 			case 0x006:				/* DTT0 */
 				if(CPU_TYPE_IS_040_PLUS(CPU_TYPE))
 				{
-					/* TODO */
+					REG_DA[(word2 >> 12) & 15] = REG_DTT0;
 					return;
 				}
 				m68ki_exception_illegal();
@@ -6788,12 +6941,18 @@ M68KMAKE_OP(movec, 32, cr, .)
 			case 0x007:				/* DTT1 */
 				if(CPU_TYPE_IS_040_PLUS(CPU_TYPE))
 				{
-					/* TODO */
+					REG_DA[(word2 >> 12) & 15] = REG_DTT1;
 					return;
 				}
 				m68ki_exception_illegal();
 				return;
 			case 0x805:				/* MMUSR */
+				if(CPU_TYPE_IS_060_PLUS(CPU_TYPE))
+				{
+					/* 68060 removed MMUSR from MOVEC — illegal */
+					m68ki_exception_illegal();
+					return;
+				}
 				if(CPU_TYPE_IS_040_PLUS(CPU_TYPE))
 				{
 					/* TODO */
@@ -6804,7 +6963,7 @@ M68KMAKE_OP(movec, 32, cr, .)
 			case 0x806:				/* URP */
 				if(CPU_TYPE_IS_040_PLUS(CPU_TYPE))
 				{
-					/* TODO */
+					REG_DA[(word2 >> 12) & 15] = REG_URP;
 					return;
 				}
 				m68ki_exception_illegal();
@@ -6812,7 +6971,7 @@ M68KMAKE_OP(movec, 32, cr, .)
 			case 0x807:				/* SRP */
 				if(CPU_TYPE_IS_040_PLUS(CPU_TYPE))
 				{
-					/* TODO */
+					REG_DA[(word2 >> 12) & 15] = REG_SRP;
 					return;
 				}
 				m68ki_exception_illegal();
@@ -6837,6 +6996,7 @@ M68KMAKE_OP(movec, 32, rc, .)
 		{
 			uint word2 = OPER_I_16();
 
+
 			m68ki_trace_t0();		   /* auto-disable (see m68kcpu.h) */
 			switch (word2 & 0xfff)
 			{
@@ -6850,8 +7010,12 @@ M68KMAKE_OP(movec, 32, rc, .)
 				/* Only EC020 and later have CACR */
 				if(CPU_TYPE_IS_EC020_PLUS(CPU_TYPE))
 				{
-					/* 68030 can write all bits except 5-7, 040 can write all */
-					if (CPU_TYPE_IS_040_PLUS(CPU_TYPE))
+					if (CPU_TYPE_IS_060_PLUS(CPU_TYPE))
+					{
+						/* 68060 CACR writable mask: bits 31-28, 23-20, 15-14, 11 */
+						REG_CACR = REG_DA[(word2 >> 12) & 15] & 0xF0F0C800;
+					}
+					else if (CPU_TYPE_IS_040_PLUS(CPU_TYPE))
 					{
 						REG_CACR = REG_DA[(word2 >> 12) & 15];
 					}
@@ -6863,6 +7027,23 @@ M68KMAKE_OP(movec, 32, rc, .)
 					{
 						REG_CACR = REG_DA[(word2 >> 12) & 15] & 0x0f;
 					}
+					return;
+				}
+				m68ki_exception_illegal();
+				return;
+			case 0x808:			   /* PCR (68060) */
+				if(CPU_TYPE_IS_060_PLUS(CPU_TYPE))
+				{
+					/* Only writable bits (low 16), preserve ID (high 16) */
+					REG_PCR = (REG_PCR & 0xFFFF0000) | (REG_DA[(word2 >> 12) & 15] & 0x0000FFFF);
+					return;
+				}
+				m68ki_exception_illegal();
+				return;
+			case 0x008:			   /* BUSCR (68060) */
+				if(CPU_TYPE_IS_060_PLUS(CPU_TYPE))
+				{
+					REG_BUSCR = REG_DA[(word2 >> 12) & 15];
 					return;
 				}
 				m68ki_exception_illegal();
@@ -6911,7 +7092,7 @@ M68KMAKE_OP(movec, 32, rc, .)
 			case 0x003:			/* TC */
 				if (CPU_TYPE_IS_040_PLUS(CPU_TYPE))
 				{
-					/* TODO */
+					REG_MMU_TC = REG_DA[(word2 >> 12) & 15];
 					return;
 				}
 				m68ki_exception_illegal();
@@ -6919,7 +7100,7 @@ M68KMAKE_OP(movec, 32, rc, .)
 			case 0x004:			/* ITT0 */
 				if (CPU_TYPE_IS_040_PLUS(CPU_TYPE))
 				{
-					/* TODO */
+					REG_ITT0 = REG_DA[(word2 >> 12) & 15];
 					return;
 				}
 				m68ki_exception_illegal();
@@ -6927,7 +7108,7 @@ M68KMAKE_OP(movec, 32, rc, .)
 			case 0x005:			/* ITT1 */
 				if (CPU_TYPE_IS_040_PLUS(CPU_TYPE))
 				{
-					/* TODO */
+					REG_ITT1 = REG_DA[(word2 >> 12) & 15];
 					return;
 				}
 				m68ki_exception_illegal();
@@ -6935,7 +7116,7 @@ M68KMAKE_OP(movec, 32, rc, .)
 			case 0x006:			/* DTT0 */
 				if (CPU_TYPE_IS_040_PLUS(CPU_TYPE))
 				{
-					/* TODO */
+					REG_DTT0 = REG_DA[(word2 >> 12) & 15];
 					return;
 				}
 				m68ki_exception_illegal();
@@ -6943,12 +7124,18 @@ M68KMAKE_OP(movec, 32, rc, .)
 			case 0x007:			/* DTT1 */
 				if (CPU_TYPE_IS_040_PLUS(CPU_TYPE))
 				{
-					/* TODO */
+					REG_DTT1 = REG_DA[(word2 >> 12) & 15];
 					return;
 				}
 				m68ki_exception_illegal();
 				return;
 			case 0x805:			/* MMUSR */
+				if(CPU_TYPE_IS_060_PLUS(CPU_TYPE))
+				{
+					/* 68060 removed MMUSR from MOVEC — illegal */
+					m68ki_exception_illegal();
+					return;
+				}
 				if (CPU_TYPE_IS_040_PLUS(CPU_TYPE))
 				{
 					/* TODO */
@@ -6959,7 +7146,7 @@ M68KMAKE_OP(movec, 32, rc, .)
 			case 0x806:			/* URP */
 				if (CPU_TYPE_IS_040_PLUS(CPU_TYPE))
 				{
-					/* TODO */
+					REG_URP = REG_DA[(word2 >> 12) & 15];
 					return;
 				}
 				m68ki_exception_illegal();
@@ -6967,7 +7154,7 @@ M68KMAKE_OP(movec, 32, rc, .)
 			case 0x807:			/* SRP */
 				if (CPU_TYPE_IS_040_PLUS(CPU_TYPE))
 				{
-					/* TODO */
+					REG_SRP = REG_DA[(word2 >> 12) & 15];
 					return;
 				}
 				m68ki_exception_illegal();
@@ -7219,6 +7406,10 @@ M68KMAKE_OP(movem, 32, er, .)
 
 M68KMAKE_OP(movep, 16, re, .)
 {
+	if(CPU_TYPE_IS_060_PLUS(CPU_TYPE)) {
+		m68ki_exception_unimplemented_integer();
+		return;
+	}
 	uint ea = EA_AY_DI_16();
 	uint src = DX;
 
@@ -7229,6 +7420,10 @@ M68KMAKE_OP(movep, 16, re, .)
 
 M68KMAKE_OP(movep, 32, re, .)
 {
+	if(CPU_TYPE_IS_060_PLUS(CPU_TYPE)) {
+		m68ki_exception_unimplemented_integer();
+		return;
+	}
 	uint ea = EA_AY_DI_32();
 	uint src = DX;
 
@@ -7241,6 +7436,10 @@ M68KMAKE_OP(movep, 32, re, .)
 
 M68KMAKE_OP(movep, 16, er, .)
 {
+	if(CPU_TYPE_IS_060_PLUS(CPU_TYPE)) {
+		m68ki_exception_unimplemented_integer();
+		return;
+	}
 	uint ea = EA_AY_DI_16();
 	uint* r_dst = &DX;
 
@@ -7250,6 +7449,10 @@ M68KMAKE_OP(movep, 16, er, .)
 
 M68KMAKE_OP(movep, 32, er, .)
 {
+	if(CPU_TYPE_IS_060_PLUS(CPU_TYPE)) {
+		m68ki_exception_unimplemented_integer();
+		return;
+	}
 	uint ea = EA_AY_DI_32();
 
 	DX = (m68ki_read_8(ea) << 24) + (m68ki_read_8(ea + 2) << 16)
@@ -7264,6 +7467,7 @@ M68KMAKE_OP(moves, 8, ., .)
 		if(FLAG_S)
 		{
 			uint word2 = OPER_I_16();
+
 			uint ea = M68KMAKE_GET_EA_AY_8;
 
 			m68ki_trace_t0();			   /* auto-disable (see m68kcpu.h) */
@@ -7299,6 +7503,7 @@ M68KMAKE_OP(moves, 16, ., .)
 		if(FLAG_S)
 		{
 			uint word2 = OPER_I_16();
+
 			uint ea = M68KMAKE_GET_EA_AY_16;
 
 			m68ki_trace_t0();			   /* auto-disable (see m68kcpu.h) */
@@ -7334,6 +7539,7 @@ M68KMAKE_OP(moves, 32, ., .)
 		if(FLAG_S)
 		{
 			uint word2 = OPER_I_16();
+
 			uint ea = M68KMAKE_GET_EA_AY_32;
 
 			m68ki_trace_t0();			   /* auto-disable (see m68kcpu.h) */
@@ -7491,6 +7697,14 @@ M68KMAKE_OP(mull, 32, ., d)
 	if(CPU_TYPE_IS_EC020_PLUS(CPU_TYPE))
 	{
 		uint word2 = OPER_I_16();
+
+		/* 68060: 64-bit MULL (Dh:Dl form) is unimplemented — trap to Vector 61.
+		 * 32-bit MULL executes natively on 060. BIT_A = 64-bit flag. */
+		if(CPU_TYPE_IS_060_PLUS(CPU_TYPE) && BIT_A(word2)) {
+			m68ki_exception_unimplemented_integer();
+			return;
+		}
+
 		uint64 src = DY;
 		uint64 dst = REG_D[(word2 >> 12) & 7];
 		uint64 res;
@@ -7539,6 +7753,13 @@ M68KMAKE_OP(mull, 32, ., d)
 	if(CPU_TYPE_IS_EC020_PLUS(CPU_TYPE))
 	{
 		uint word2 = OPER_I_16();
+
+		/* 68060: 64-bit MULL (Dh:Dl form) is unimplemented — trap to Vector 61.
+		 * 32-bit MULL executes natively on 060. BIT_A = 64-bit flag. */
+		if(CPU_TYPE_IS_060_PLUS(CPU_TYPE) && BIT_A(word2)) {
+			m68ki_exception_unimplemented_integer();
+			return;
+		}
 		uint src = DY;
 		uint dst = REG_D[(word2 >> 12) & 7];
 		uint neg = GET_MSB_32(src ^ dst);
@@ -7615,6 +7836,13 @@ M68KMAKE_OP(mull, 32, ., .)
 	if(CPU_TYPE_IS_EC020_PLUS(CPU_TYPE))
 	{
 		uint word2 = OPER_I_16();
+
+		/* 68060: 64-bit MULL (Dh:Dl form) is unimplemented — trap to Vector 61.
+		 * 32-bit MULL executes natively on 060. BIT_A = 64-bit flag. */
+		if(CPU_TYPE_IS_060_PLUS(CPU_TYPE) && BIT_A(word2)) {
+			m68ki_exception_unimplemented_integer();
+			return;
+		}
 		uint64 src = M68KMAKE_GET_OPER_AY_32;
 		uint64 dst = REG_D[(word2 >> 12) & 7];
 		uint64 res;
@@ -7663,6 +7891,13 @@ M68KMAKE_OP(mull, 32, ., .)
 	if(CPU_TYPE_IS_EC020_PLUS(CPU_TYPE))
 	{
 		uint word2 = OPER_I_16();
+
+		/* 68060: 64-bit MULL (Dh:Dl form) is unimplemented — trap to Vector 61.
+		 * 32-bit MULL executes natively on 060. BIT_A = 64-bit flag. */
+		if(CPU_TYPE_IS_060_PLUS(CPU_TYPE) && BIT_A(word2)) {
+			m68ki_exception_unimplemented_integer();
+			return;
+		}
 		uint src = M68KMAKE_GET_OPER_AY_32;
 		uint dst = REG_D[(word2 >> 12) & 7];
 		uint neg = GET_MSB_32(src ^ dst);
@@ -8368,6 +8603,22 @@ M68KMAKE_OP(pea, 32, ., .)
 
 M68KMAKE_OP(pflush, 32, ., .)
 {
+	/* 68060: PLPAW instruction — Translate Logical to Physical Address (write)
+	 * PLPAW (An): 1111 0101 0001 1rrr  ($F518+An)
+	 * The pflush opcode table entry (mask 0xFFF8, match 0xF518) captures
+	 * PLPAW before it reaches the 1111 handler.
+	 * Without a full MMU implementation, PLPA is effectively a no-op
+	 * (logical address == physical address). */
+	if (CPU_TYPE_IS_060_PLUS(CPU_TYPE))
+	{
+		uint16 ir = REG_IR;
+		if ((ir & 0xFFF8) == 0xF518)
+		{
+			USE_CYCLES(4);
+			return;
+		}
+	}
+
 	if ((CPU_TYPE_IS_EC020_PLUS(CPU_TYPE)) && (HAS_PMMU))
 	{
 		fprintf(stderr,"68040: unhandled PFLUSH\n");
@@ -8378,6 +8629,14 @@ M68KMAKE_OP(pflush, 32, ., .)
 
 M68KMAKE_OP(pmmu, 32, ., .)
 {
+	/* 68060: Old-style PMMU coprocessor instructions (PTEST, PFLUSH, PLOAD,
+	 * PBcc, PMOVE) are not valid on 060 — trap to F-line.
+	 * The 060 has its own MMU but uses MOVEC for register access
+	 * and PLPA for address translation. */
+	if(CPU_TYPE_IS_060_PLUS(CPU_TYPE)) {
+		m68ki_exception_1111();
+		return;
+	}
 	if ((CPU_TYPE_IS_EC020_PLUS(CPU_TYPE)) && (HAS_PMMU))
 	{
 		m68881_mmu_ops();

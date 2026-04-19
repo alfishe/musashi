@@ -74,6 +74,9 @@ const char *const m68ki_cpu_names[] =
 	"M68LC040",
 	"M68040",
 	"SCC68070",
+	"M68EC060",
+	"M68LC060",
+	"M68060",
 };
 #endif /* M68K_LOG_ENABLE */
 
@@ -663,6 +666,8 @@ unsigned int m68k_get_reg(void* context, m68k_register_t regnum)
 		case M68K_REG_VBR:	return cpu->vbr;
 		case M68K_REG_CACR:	return cpu->cacr;
 		case M68K_REG_CAAR:	return cpu->caar;
+		case M68K_REG_PCR:	return cpu->pcr;
+		case M68K_REG_BUSCR:	return cpu->buscr;
 		case M68K_REG_PREF_ADDR:	return cpu->pref_addr;
 		case M68K_REG_PREF_DATA:	return cpu->pref_data;
 		case M68K_REG_PPC:	return MASK_OUT_ABOVE_32(cpu->ppc);
@@ -675,6 +680,9 @@ unsigned int m68k_get_reg(void* context, m68k_register_t regnum)
 				case CPU_TYPE_EC020:	return (unsigned int)M68K_CPU_TYPE_68EC020;
 				case CPU_TYPE_020:		return (unsigned int)M68K_CPU_TYPE_68020;
 				case CPU_TYPE_040:		return (unsigned int)M68K_CPU_TYPE_68040;
+				case CPU_TYPE_EC060:	return (unsigned int)M68K_CPU_TYPE_68EC060;
+				case CPU_TYPE_LC060:	return (unsigned int)M68K_CPU_TYPE_68LC060;
+				case CPU_TYPE_060:		return (unsigned int)M68K_CPU_TYPE_68060;
 			}
 			return M68K_CPU_TYPE_INVALID;
 		default:			return 0;
@@ -725,6 +733,9 @@ void m68k_set_reg(m68k_register_t regnum, unsigned int value)
 		case M68K_REG_DFC:	REG_DFC = value & 7; return;
 		case M68K_REG_CACR:	REG_CACR = MASK_OUT_ABOVE_32(value); return;
 		case M68K_REG_CAAR:	REG_CAAR = MASK_OUT_ABOVE_32(value); return;
+		case M68K_REG_PCR:	/* Only writable bits, preserve ID */
+							REG_PCR = (REG_PCR & 0xFFFF0000) | (value & 0x0000FFFF); return;
+		case M68K_REG_BUSCR:	REG_BUSCR = MASK_OUT_ABOVE_32(value); return;
 		case M68K_REG_PPC:	REG_PPC = MASK_OUT_ABOVE_32(value); return;
 		case M68K_REG_IR:	REG_IR = MASK_OUT_ABOVE_16(value); return;
 		case M68K_REG_CPU_TYPE: m68k_set_cpu_type(value); return;
@@ -809,6 +820,7 @@ void m68k_set_cpu_type(unsigned int cpu_type)
 			CYC_SHIFT        = 1;
 			CYC_RESET        = 132;
 			HAS_PMMU	 = 0;
+			HAS_FPU		 = 0;
 			return;
 		case M68K_CPU_TYPE_SCC68070:
 			m68k_set_cpu_type(M68K_CPU_TYPE_68010);
@@ -916,6 +928,7 @@ void m68k_set_cpu_type(unsigned int cpu_type)
 			CYC_SHIFT        = 0;
 			CYC_RESET        = 518;
 			HAS_PMMU	 = 1;
+			HAS_FPU		 = 1;
 			return;
 		case M68K_CPU_TYPE_68EC040: // Just a 68040 without pmmu apparently...
 			CPU_TYPE         = CPU_TYPE_EC040;
@@ -933,6 +946,7 @@ void m68k_set_cpu_type(unsigned int cpu_type)
 			CYC_SHIFT        = 0;
 			CYC_RESET        = 518;
 			HAS_PMMU	 = 0;
+			HAS_FPU		 = 0;
 			return;
 		case M68K_CPU_TYPE_68LC040:
 			CPU_TYPE         = CPU_TYPE_LC040;
@@ -949,6 +963,69 @@ void m68k_set_cpu_type(unsigned int cpu_type)
 			m68ki_cpu.cyc_shift        = 0;
 			m68ki_cpu.cyc_reset        = 518;
 			HAS_PMMU	       = 1;
+			HAS_FPU		       = 0;
+			return;
+		case M68K_CPU_TYPE_68EC060:
+			CPU_TYPE         = CPU_TYPE_EC060;
+			CPU_ADDRESS_MASK = 0xffffffff;
+			CPU_SR_MASK      = 0xf71f;
+			CYC_INSTRUCTION  = m68ki_cycles[4]; /* Use 040 cycle table for now */
+			CYC_EXCEPTION    = m68ki_exception_cycle_table[4];
+			CYC_BCC_NOTAKE_B = -2;
+			CYC_BCC_NOTAKE_W = 0;
+			CYC_DBCC_F_NOEXP = 0;
+			CYC_DBCC_F_EXP   = 4;
+			CYC_SCC_R_TRUE   = 0;
+			CYC_MOVEM_W      = 2;
+			CYC_MOVEM_L      = 2;
+			CYC_SHIFT        = 0;
+			CYC_RESET        = 518;
+			HAS_PMMU	 = 0;  /* EC060 has no MMU */
+			HAS_FPU		 = 0;  /* EC060 has no FPU */
+			REG_PCR		 = 0x04320000; /* EC060 silicon ID, DFP set below */
+			REG_PCR		 |= (1 << 14); /* DFP bit = FPU disabled */
+			REG_BUSCR	 = 0;
+			return;
+		case M68K_CPU_TYPE_68LC060:
+			CPU_TYPE         = CPU_TYPE_LC060;
+			CPU_ADDRESS_MASK = 0xffffffff;
+			CPU_SR_MASK      = 0xf71f;
+			CYC_INSTRUCTION  = m68ki_cycles[4];
+			CYC_EXCEPTION    = m68ki_exception_cycle_table[4];
+			CYC_BCC_NOTAKE_B = -2;
+			CYC_BCC_NOTAKE_W = 0;
+			CYC_DBCC_F_NOEXP = 0;
+			CYC_DBCC_F_EXP   = 4;
+			CYC_SCC_R_TRUE   = 0;
+			CYC_MOVEM_W      = 2;
+			CYC_MOVEM_L      = 2;
+			CYC_SHIFT        = 0;
+			CYC_RESET        = 518;
+			HAS_PMMU	 = M68K_EMULATE_PMMU; /* LC060 has MMU */
+			HAS_FPU		 = 0;  /* LC060 has no FPU */
+			REG_PCR		 = 0x04310000; /* LC060 silicon ID */
+			REG_PCR		 |= (1 << 14); /* DFP bit = FPU disabled */
+			REG_BUSCR	 = 0;
+			return;
+		case M68K_CPU_TYPE_68060:
+			CPU_TYPE         = CPU_TYPE_060;
+			CPU_ADDRESS_MASK = 0xffffffff;
+			CPU_SR_MASK      = 0xf71f;
+			CYC_INSTRUCTION  = m68ki_cycles[4];
+			CYC_EXCEPTION    = m68ki_exception_cycle_table[4];
+			CYC_BCC_NOTAKE_B = -2;
+			CYC_BCC_NOTAKE_W = 0;
+			CYC_DBCC_F_NOEXP = 0;
+			CYC_DBCC_F_EXP   = 4;
+			CYC_SCC_R_TRUE   = 0;
+			CYC_MOVEM_W      = 2;
+			CYC_MOVEM_L      = 2;
+			CYC_SHIFT        = 0;
+			CYC_RESET        = 518;
+			HAS_PMMU	 = M68K_EMULATE_PMMU; /* 060 has MMU */
+			HAS_FPU		 = 1;  /* Full 060 has FPU (subset) */
+			REG_PCR		 = 0x04300000; /* MC68060 silicon ID */
+			REG_BUSCR	 = 0;
 			return;
 	}
 }

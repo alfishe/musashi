@@ -10,9 +10,12 @@ default: all
 all:
 	@$(MAKE) -C mc68000 all
 	@$(MAKE) -C mc68040 all
+	@$(MAKE) -C mc68060 all
 
 clean:
 	@$(MAKE) -C mc68000 clean
 	@$(MAKE) -C mc68040 clean
+	@$(MAKE) -C mc68060 clean
 
 .PHONY: clean all
+

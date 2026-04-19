@@ -103,7 +103,10 @@ enum
 	M68K_CPU_TYPE_68EC040,
 	M68K_CPU_TYPE_68LC040,
 	M68K_CPU_TYPE_68040,
-	M68K_CPU_TYPE_SCC68070
+	M68K_CPU_TYPE_SCC68070,
+	M68K_CPU_TYPE_68EC060,
+	M68K_CPU_TYPE_68LC060,
+	M68K_CPU_TYPE_68060
 };
 
 /* Registers used by m68k_get_reg() and m68k_set_reg() */
@@ -137,6 +140,10 @@ typedef enum
 	M68K_REG_VBR,		/* Vector Base Register */
 	M68K_REG_CACR,		/* Cache Control Register */
 	M68K_REG_CAAR,		/* Cache Address Register */
+
+	/* 68060-specific registers */
+	M68K_REG_PCR,		/* Processor Configuration Register (68060) */
+	M68K_REG_BUSCR,		/* Bus Control Register (68060) */
 
 	/* Assumed registers */
 	/* These are cheat registers which emulate the 1-longword prefetch
