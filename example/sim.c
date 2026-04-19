@@ -373,7 +373,7 @@ void output_device_reset(void)
 
 void output_device_update(void)
 {
-	if(!g_output_device_ready)
+	if(g_output_device_ready)
 	{
 		if((time(NULL) - g_output_device_last_output) >= OUTPUT_DEVICE_PERIOD)
 		{
@@ -401,6 +401,7 @@ void output_device_write(unsigned int value)
 	{
 		ch = value & 0xff;
 		printf("%c", ch);
+		fflush(stdout);
 		g_output_device_last_output = time(NULL);
 		g_output_device_ready = 0;
 		int_controller_clear(IRQ_OUTPUT_DEVICE);
