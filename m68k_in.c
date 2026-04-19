@@ -6889,7 +6889,7 @@ M68KMAKE_OP(movec, 32, cr, .)
 					return;
 				}
 				m68ki_exception_illegal();
-				break;
+				return; /* was break — see https://github.com/kstenerud/Musashi/issues/94 */
 			case 0x803:			   /* MSP */
 				if(CPU_TYPE_IS_EC020_PLUS(CPU_TYPE))
 				{

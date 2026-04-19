@@ -81,6 +81,12 @@ TESTS_EC060_RUN = $(TESTS_EC060:%=%.ec060.bin)
 $(TESTS_EC060_RUN): test_driver$(EXE)
 	./test_driver$(EXE) --cpu=68ec060 test/mc68060/$(patsubst %.ec060.bin,%.bin,$@)
 
+# 68010 regression tests
+TESTS_68010 = movec_caar_bug
+TESTS_68010_RUN = $(TESTS_68010:%=%.010.bin)
+$(TESTS_68010_RUN): test_driver$(EXE)
+	./test_driver$(EXE) --cpu=68010 test/mc68010/$(patsubst %.010.bin,%.bin,$@)
+
 build_tests:
 	@$(MAKE) -C test all
-test: $(TESTS_68000_RUN) $(TESTS_68040_RUN) $(TESTS_68060_RUN) $(TESTS_LC060_RUN) $(TESTS_EC060_RUN)
+test: $(TESTS_68000_RUN) $(TESTS_68010_RUN) $(TESTS_68040_RUN) $(TESTS_68060_RUN) $(TESTS_LC060_RUN) $(TESTS_EC060_RUN)
