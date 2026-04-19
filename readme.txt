@@ -262,7 +262,7 @@ obscure functions of the m68k:
 - M68K_EMULATE_RESET causes the CPU to call a reset handler on a RESET
   instruction.
 
-- M68K_EMULATE_PREFETCH emulates the 4-word instruction prefetch that is part
+- M68K_EMULATE_PREFETCH emulates the 2-word instruction prefetch that is part
   of the 68000/68010 (needed for Amiga emulation).
   NOTE: if the CPU fetches a word or longword at an odd address when this
   option is on, it will yield unpredictable results, which is why a real
