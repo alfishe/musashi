@@ -470,7 +470,10 @@ typedef uint32 uint64;
 #else
 	#define CPU_TYPE_IS_010(A)         0
 	#define CPU_TYPE_IS_010_PLUS(A)    CPU_TYPE_IS_EC020_PLUS(A)
-	#define CPU_TYPE_IS_010_LESS(A)    CPU_TYPE_IS_EC020_LESS(A)
+	/* When 010 emulation is off, "010 or less" must NOT include EC020+,
+	 * otherwise EC020 gets the simple 68000-style EA decoding instead of
+	 * full extension word format. See: https://github.com/kstenerud/Musashi/issues/115 */
+	#define CPU_TYPE_IS_010_LESS(A)    ((A) & (CPU_TYPE_000 | CPU_TYPE_008))
 #endif
 
 #if M68K_EMULATE_020 || M68K_EMULATE_EC020
