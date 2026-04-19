@@ -4628,8 +4628,17 @@ M68KMAKE_OP(divl, 32, ., d)
 
 				if(BIT_B(word2))	   /* signed */
 				{
-					quotient  = (uint64)((sint64)dividend / (sint64)((sint32)divisor));
-					remainder = (uint64)((sint64)dividend % (sint64)((sint32)divisor));
+					/* Guard against INT64_MIN / -1 which is undefined behavior in C.
+					 * On real hardware this overflows — set V=1 and abort.
+					 * See: https://github.com/kstenerud/Musashi/issues/113 */
+					sint64 s_divisor = (sint64)((sint32)divisor);
+					if((sint64)dividend == (sint64)0x8000000000000000ULL && s_divisor == -1)
+					{
+						FLAG_V = VFLAG_SET;
+						return;
+					}
+					quotient  = (uint64)((sint64)dividend / s_divisor);
+					remainder = (uint64)((sint64)dividend % s_divisor);
 					if((sint64)quotient != (sint64)((sint32)quotient))
 					{
 						FLAG_V = VFLAG_SET;
@@ -4853,8 +4862,17 @@ M68KMAKE_OP(divl, 32, ., .)
 
 				if(BIT_B(word2))	   /* signed */
 				{
-					quotient  = (uint64)((sint64)dividend / (sint64)((sint32)divisor));
-					remainder = (uint64)((sint64)dividend % (sint64)((sint32)divisor));
+					/* Guard against INT64_MIN / -1 which is undefined behavior in C.
+					 * On real hardware this overflows — set V=1 and abort.
+					 * See: https://github.com/kstenerud/Musashi/issues/113 */
+					sint64 s_divisor = (sint64)((sint32)divisor);
+					if((sint64)dividend == (sint64)0x8000000000000000ULL && s_divisor == -1)
+					{
+						FLAG_V = VFLAG_SET;
+						return;
+					}
+					quotient  = (uint64)((sint64)dividend / s_divisor);
+					remainder = (uint64)((sint64)dividend % s_divisor);
 					if((sint64)quotient != (sint64)((sint32)quotient))
 					{
 						FLAG_V = VFLAG_SET;
