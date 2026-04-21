@@ -911,6 +911,32 @@ M68KMAKE_OP(1010, 0, ., .)
 
 M68KMAKE_OP(1111, 0, ., .)
 {
+	uint16 ir = REG_IR;
+
+	/* 68040+: CINV/CPUSH cache instructions - no-op in emulator
+	 * CINV:  F4xx where (ir & 0xFF20) == 0xF400
+	 * CPUSH: F4xx where (ir & 0xFF20) == 0xF420 */
+	if (CPU_TYPE_IS_040_PLUS(CPU_TYPE))
+	{
+		if ((ir & 0xFF20) == 0xF400 || (ir & 0xFF20) == 0xF420)
+		{
+			USE_CYCLES(4);
+			return;
+		}
+	}
+
+	/* 68040: PTEST/PFLUSH instructions in F5xx range
+	 * These need to be dispatched to m68881_mmu_ops() */
+	if (CPU_TYPE_IS_040_PLUS(CPU_TYPE) && HAS_PMMU)
+	{
+		/* Check for 68040 PMMU instructions: F5xx range */
+		if ((ir & 0xFF00) == 0xF500)
+		{
+			m68881_mmu_ops();
+			return;
+		}
+	}
+
 	/* 68060: PLPA instruction — Translate Logical to Physical Address
 	 * PLPAW (An): 1111 0101 0001 1rrr  ($F518+An)
 	 * PLPAR (An): 1111 0101 0100 1rrr  ($F548+An)
@@ -920,7 +946,6 @@ M68KMAKE_OP(1111, 0, ., .)
 	 * (logical address == physical address). */
 	if (CPU_TYPE_IS_060_PLUS(CPU_TYPE))
 	{
-		uint16 ir = REG_IR;
 		if ((ir & 0xFFF8) == 0xF548 || (ir & 0xFFF8) == 0xF518)
 		{
 			USE_CYCLES(4);
@@ -6973,7 +6998,7 @@ M68KMAKE_OP(movec, 32, cr, .)
 				}
 				if(CPU_TYPE_IS_040_PLUS(CPU_TYPE))
 				{
-					/* TODO */
+					REG_DA[(word2 >> 12) & 15] = m68ki_cpu.mmu_sr;
 					return;
 				}
 				m68ki_exception_illegal();
@@ -7111,6 +7136,8 @@ M68KMAKE_OP(movec, 32, rc, .)
 				if (CPU_TYPE_IS_040_PLUS(CPU_TYPE))
 				{
 					REG_MMU_TC = REG_DA[(word2 >> 12) & 15];
+					/* 68040 TC: bit 15 = E (enable MMU) */
+					m68ki_cpu.pmmu_enabled = (REG_MMU_TC >> 15) & 1;
 					return;
 				}
 				m68ki_exception_illegal();

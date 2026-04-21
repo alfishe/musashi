@@ -50,6 +50,11 @@ TESTS_68000 = abcd adda add_i addq add addx andi_to_ccr andi_to_sr and \
 TESTS_68040 = bfchg bfclr bfext bfffo bfins bfset bftst cas chk2 cmp2 \
 	divs_long divu_long interrupt jmp mul_long rtd shifts3 trapcc
 
+# 68040 MMU tests
+TESTS_68040_MMU = movec_tc movec_urp_srp mmu_simple tt_data walk_4k walk_8k \
+	ptest_wp ptest_super ptest_modified ptest_global pflusha pflush_page \
+	pflushn invalid_page cinv_cpush indirect_desc um_bits
+
 TESTS_68000_RUN = $(TESTS_68000:%=%.bin)
 $(TESTS_68000_RUN): test_driver$(EXE)
 	./test_driver$(EXE) test/mc68000/$@
@@ -57,6 +62,10 @@ $(TESTS_68000_RUN): test_driver$(EXE)
 TESTS_68040_RUN = $(TESTS_68040:%=%.bin)
 $(TESTS_68040_RUN): test_driver$(EXE)
 	./test_driver$(EXE) test/mc68040/$@
+
+TESTS_68040_MMU_RUN = $(TESTS_68040_MMU:%=%.040.bin)
+$(TESTS_68040_MMU_RUN): test_driver$(EXE)
+	./test_driver$(EXE) --cpu=68040 test/mc68040/$(patsubst %.040.bin,%.bin,$@)
 
 TESTS_68060 = movep_trap cas2_trap chk2_cmp2_trap mull_64_trap divl_64_trap \
 	movec_pcr movec_cacr_mask movec_buscr pcr_write_mask mmusr_trap \
@@ -96,4 +105,4 @@ $(TESTS_68030_RUN): test_driver$(EXE)
 
 build_tests:
 	@$(MAKE) -C test all
-test: $(TESTS_68000_RUN) $(TESTS_68010_RUN) $(TESTS_68030_RUN) $(TESTS_68040_RUN) $(TESTS_68060_RUN) $(TESTS_LC060_RUN) $(TESTS_EC060_RUN)
+test: $(TESTS_68000_RUN) $(TESTS_68010_RUN) $(TESTS_68030_RUN) $(TESTS_68040_RUN) $(TESTS_68040_MMU_RUN) $(TESTS_68060_RUN) $(TESTS_LC060_RUN) $(TESTS_EC060_RUN)

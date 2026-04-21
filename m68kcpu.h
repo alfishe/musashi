@@ -433,9 +433,11 @@ typedef uint32 uint64;
 
 #if M68K_EMULATE_040
 #define CPU_TYPE_IS_040_PLUS(A)    ((A) & (CPU_TYPE_040 | CPU_TYPE_EC040 | CPU_TYPE_060 | CPU_TYPE_EC060 | CPU_TYPE_LC060))
+#define CPU_TYPE_IS_040(A)         ((A) & (CPU_TYPE_040 | CPU_TYPE_EC040))
 	#define CPU_TYPE_IS_040_LESS(A)    1
 #else
 	#define CPU_TYPE_IS_040_PLUS(A)    0
+	#define CPU_TYPE_IS_040(A)         0
 	#define CPU_TYPE_IS_040_LESS(A)    1
 #endif
 

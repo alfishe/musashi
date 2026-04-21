@@ -10,13 +10,14 @@
     jsr setup_060_vectors
 
     * --- TC ($003) round-trip ---
-    mov.l   #0x80C0, %d0
+    * Use value with E bit clear (bit 15) to avoid enabling MMU without page tables
+    mov.l   #0x40C0, %d0
     .short  0x4E7B              | MOVEC Rn,cr
     .short  0x0003              | D0 -> TC
     clr.l   %d0
     .short  0x4E7A              | MOVEC cr,Rn
     .short  0x0003              | TC -> D0
-    cmpi.l  #0x80C0, %d0
+    cmpi.l  #0x40C0, %d0
     bne     TEST_FAIL
 
     * --- ITT0 ($004) round-trip ---

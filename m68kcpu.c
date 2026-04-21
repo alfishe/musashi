@@ -1201,6 +1201,15 @@ void m68k_pulse_reset(void)
 	m68ki_cpu.mmu_tt0 = 0;
 	m68ki_cpu.mmu_tt1 = 0;
 	m68ki_cpu.mmu_tc = 0;
+
+	/* Clear 68040 MMU registers */
+	m68ki_cpu.mmu040_tc = 0;
+	m68ki_cpu.mmu040_itt0 = 0;
+	m68ki_cpu.mmu040_itt1 = 0;
+	m68ki_cpu.mmu040_dtt0 = 0;
+	m68ki_cpu.mmu040_dtt1 = 0;
+	m68ki_cpu.mmu040_urp = 0;
+	m68ki_cpu.mmu040_srp = 0;
 	m68ki_cpu.mmu_sr = 0;
 	m68ki_cpu.mmu_tmp_buserror_occurred = 0;
 	m68ki_cpu.mmu_tablewalk = 0;
