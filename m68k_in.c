@@ -8624,24 +8624,35 @@ M68KMAKE_OP(pflush, 32, ., .)
 	/* 68060: PLPAW instruction — Translate Logical to Physical Address (write)
 	 * PLPAW (An): 1111 0101 0001 1rrr  ($F518+An)
 	 * The pflush opcode table entry (mask 0xFFF8, match 0xF518) captures
-	 * PLPAW before it reaches the 1111 handler.
-	 * Without a full MMU implementation, PLPA is effectively a no-op
-	 * (logical address == physical address). */
+	 * PLPAW before it reaches the 1111 handler. */
 	if (CPU_TYPE_IS_060_PLUS(CPU_TYPE))
 	{
 		uint16 ir = REG_IR;
-		if ((ir & 0xFFF8) == 0xF518)
+		if ((ir & 0xFFF8) == 0xF518)  /* PLPAW (An) */
 		{
+			/* TODO: With full 040/060 MMU, perform actual translation */
 			USE_CYCLES(4);
 			return;
 		}
-	}
-
-	if ((CPU_TYPE_IS_EC020_PLUS(CPU_TYPE)) && (HAS_PMMU))
-	{
-		fprintf(stderr,"68040: unhandled PFLUSH\n");
+		/* Other F5xx instructions trap to F-line on 060 */
+		m68ki_exception_1111();
 		return;
 	}
+
+	/* 68040: PFLUSH variants - TODO: implement with full 040 MMU */
+	if (CPU_TYPE_IS_040_PLUS(CPU_TYPE))
+	{
+		if (FLAG_S)
+		{
+			/* TODO: Implement 040 PFLUSH when 040 MMU phase is done */
+			USE_CYCLES(4);
+			return;
+		}
+		m68ki_exception_privilege_violation();
+		return;
+	}
+
+	/* Not a 040/060: invalid instruction */
 	m68ki_exception_1111();
 }
 

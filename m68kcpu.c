@@ -1197,6 +1197,22 @@ void m68k_pulse_reset(void)
 	/* Disable the PMMU on reset */
 	m68ki_cpu.pmmu_enabled = 0;
 
+	/* Clear MMU translation state */
+	m68ki_cpu.mmu_tt0 = 0;
+	m68ki_cpu.mmu_tt1 = 0;
+	m68ki_cpu.mmu_tc = 0;
+	m68ki_cpu.mmu_sr = 0;
+	m68ki_cpu.mmu_tmp_buserror_occurred = 0;
+	m68ki_cpu.mmu_tablewalk = 0;
+	m68ki_cpu.mmu_atc_rr = 0;
+	{
+		int i;
+		for (i = 0; i < MMU_ATC_ENTRIES; i++) {
+			m68ki_cpu.mmu_atc_tag[i] = 0;
+			m68ki_cpu.mmu_atc_data[i] = 0;
+		}
+	}
+
 	/* Clear all stop levels and eat up all remaining cycles */
 	CPU_STOPPED = 0;
 	SET_CYCLES(0);

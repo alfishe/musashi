@@ -15,7 +15,7 @@ EXEPATH = ./
 CC        = gcc
 WARNINGS  = -Wall -Wextra -pedantic -g
 CFLAGS    = $(WARNINGS)
-LFLAGS    = $(WARNINGS)
+LFLAGS    = $(WARNINGS) -Wl,-w
 
 DELETEFILES = $(MUSASHIGENCFILES) $(MUSASHIGENHFILES) $(.OFILES) $(TARGET) $(MUSASHIGENERATOR)$(EXE) test_driver$(EXE)
 
@@ -36,7 +36,7 @@ $(MUSASHIGENERATOR)$(EXE):  $(MUSASHIGENERATOR).c
 	$(CC) -o  $(MUSASHIGENERATOR)$(EXE)  $(MUSASHIGENERATOR).c
 
 test_driver$(EXE): test/test_driver.c $(.OFILES)
-	$(CC) $(CFLAGS) -o test_driver$(EXE) test/test_driver.c $(.OFILES) -I. -lm
+	$(CC) $(CFLAGS) $(LFLAGS) -o test_driver$(EXE) test/test_driver.c $(.OFILES) -I. -lm
 
 
 TESTS_68000 = abcd adda add_i addq add addx andi_to_ccr andi_to_sr and \
@@ -87,6 +87,13 @@ TESTS_68010_RUN = $(TESTS_68010:%=%.010.bin)
 $(TESTS_68010_RUN): test_driver$(EXE)
 	./test_driver$(EXE) --cpu=68010 test/mc68010/$(patsubst %.010.bin,%.bin,$@)
 
+# 68030 MMU tests
+TESTS_68030 = pmove_tt pmove_tc mmu_identity pflush_all pload_atc ptest_walk ptest_wp tt_match \
+              ptest_invalid ptest_multi ptest_super pflush_fc wp_buserr
+TESTS_68030_RUN = $(TESTS_68030:%=%.030.bin)
+$(TESTS_68030_RUN): test_driver$(EXE)
+	./test_driver$(EXE) --cpu=68030 test/mc68030/$(patsubst %.030.bin,%.bin,$@)
+
 build_tests:
 	@$(MAKE) -C test all
-test: $(TESTS_68000_RUN) $(TESTS_68010_RUN) $(TESTS_68040_RUN) $(TESTS_68060_RUN) $(TESTS_LC060_RUN) $(TESTS_EC060_RUN)
+test: $(TESTS_68000_RUN) $(TESTS_68010_RUN) $(TESTS_68030_RUN) $(TESTS_68040_RUN) $(TESTS_68060_RUN) $(TESTS_LC060_RUN) $(TESTS_EC060_RUN)

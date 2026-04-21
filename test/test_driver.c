@@ -305,6 +305,7 @@ size_t rom_slot_init(rom_slot_t* dev, FILE* file) {
 /// Devices
 ram_slot_t g_stack;
 ram_slot_t g_extra_ram1;
+ram_slot_t g_extra_ram2;  /* For MMU tests - page tables at 0x300000, test data at 0x400000 */
 
 #define N_ROMS 4
 rom_slot_t g_roms[N_ROMS];
@@ -318,6 +319,7 @@ void setup_memory(void) {
     for (unsigned i = 0; i < N_ROMS; ++i)
         memory_map_add(&g_roms[i].dev, RAM_SLOT_SIZE + ROM_SLOT_SIZE * i, ROM_SLOT_SIZE);
     memory_map_add(&g_extra_ram1.dev, 0x300000, RAM_SLOT_SIZE);
+    memory_map_add(&g_extra_ram2.dev, 0x400000, RAM_SLOT_SIZE);  /* MMU test data area */
 
     memory_map_add(&g_test_device.dev, 0x100000, 0x10000);
 }
@@ -390,6 +392,7 @@ int main(int argc, char* argv[]) {
 
     ram_slot_init(&g_stack);
     ram_slot_init(&g_extra_ram1);
+    ram_slot_init(&g_extra_ram2);
     for (int i = 0; i < N_ROMS; ++i) {
         rom_slot_init(&g_roms[i], infile);
     }
