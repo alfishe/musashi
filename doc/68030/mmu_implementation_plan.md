@@ -164,6 +164,53 @@ void m68k_set_atc_replace_callback(m68k_atc_replace_callback cb);
 > [!IMPORTANT]
 > **Rationale**: If Musashi implements strict True LRU but the FPGA RTL implements Tree-based PLRU, they will eventually disagree on which entry to evict. When the guest OS accesses an address that Musashi kept but the RTL evicted, the RTL triggers a table walk while Musashi reports an ATC hit — instant co-sim desync. The callback hook lets the testbench force Musashi to use the FPGA's exact eviction logic.
 
+**Default Implementation: Bit-PLRU (MRU approximation)**
+
+The recommended default (when no callback is installed) is the Bit-PLRU algorithm, which matches the hardware behaviour described in §9.7.1.1 using a single 32-bit integer as a 22-bit history register:
+
+1. Maintain a 22-bit History Register (`mmu_atc_history`, one bit per entry), initialized to all `0`s.
+2. On every ATC access (both hits and fills), set the accessed entry's corresponding history bit to `1`.
+3. If setting this bit would cause all 22 bits to become `1`, instead set *only* the currently accessed entry's bit to `1`, and clear the other 21 bits to `0`.
+4. When the ATC is full and an eviction is required, scan the History Register (from index 0 to 21) and select the first entry whose history bit is `0` as the victim.
+
+```mermaid
+flowchart TD
+    A[Translation Requested] --> B{Hits in ATC?}
+    B -- Yes (Hit) --> C["Locate Hit Entry N"]
+    B -- No (Miss) --> D{ATC Full?}
+    D -- No --> E["Fill empty Entry N"]
+    D -- Yes --> F["Find lowest index N where History[N] == 0"]
+    F --> G["Evict Entry N, Fill new descriptor"]
+
+    C --> H
+    E --> H
+    G --> H
+
+    H["Set History[N] = 1"] --> I{"Are all 22 bits == 1?"}
+    I -- Yes --> J["Clear all bits except History[N]"]
+    I -- No --> K[Done]
+```
+
+```mermaid
+stateDiagram-v2
+    state "Initial State" as s1
+    state "After Accessing Entry 3" as s2
+    state "History Full (21 bits set)" as s3
+    state "Accessing last 0 bit (Entry 7)" as s4
+
+    s1: History = [0,0,0,0...0]
+    s2: History = [0,0,0,1...0]
+    s3: History = [1,1,1,1,1,1,1,0,1...1]
+    s4: History = [0,0,0,0,0,0,0,1,0...0]
+
+    s1 --> s2 : Access Entry 3
+    s2 --> s3 : Access all other entries except 7
+    s3 --> s4 : "Access Entry 7 (all would be 1, so clear others)"
+```
+
+> [!NOTE]
+> `mmu_atc_history` must be reset to `0` in both `pmmu_atc_flush()` and `m68k_pulse_reset()`.
+
 API:
 ```c
 int  atc_lookup(uint32 addr, uint fc, int write, m68k_atc_entry *result);
