@@ -89,7 +89,7 @@ $(TESTS_68010_RUN): test_driver$(EXE)
 
 # 68030 MMU tests
 TESTS_68030 = pmove_tt pmove_tc mmu_identity pflush_all pload_atc ptest_walk ptest_wp tt_match \
-              ptest_invalid ptest_multi ptest_super pflush_fc wp_buserr
+              ptest_invalid ptest_multi ptest_super pflush_fc wp_buserr mmu_reset
 TESTS_68030_RUN = $(TESTS_68030:%=%.030.bin)
 $(TESTS_68030_RUN): test_driver$(EXE)
 	./test_driver$(EXE) --cpu=68030 test/mc68030/$(patsubst %.030.bin,%.bin,$@)

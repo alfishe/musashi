@@ -126,6 +126,10 @@ static void pmmu_set_buserror(uint32 addr_in)
 		m68ki_cpu.mmu_tmp_buserror_rw = m68ki_cpu.mmu_tmp_rw;
 		m68ki_cpu.mmu_tmp_buserror_fc = m68ki_cpu.mmu_tmp_fc;
 		m68ki_cpu.mmu_tmp_buserror_sz = m68ki_cpu.mmu_tmp_sz;
+
+		/* Co-sim: notify access fault */
+		m68ki_mmu_cosim_fault(addr_in, m68ki_cpu.mmu_tmp_fc,
+			m68ki_cpu.mmu_tmp_rw ? 0 : 1, M68K_MMU_FAULT_BUS_ERROR);
 	}
 }
 
@@ -133,10 +137,40 @@ static void pmmu_set_buserror(uint32 addr_in)
 /* =================== ADDRESS TRANSLATION CACHE (ATC) ==================== */
 /* ======================================================================== */
 
+/* pmmu_atc_update_history: update PLRU history for entry N */
+static void pmmu_atc_update_history(int entry)
+{
+	uint32 bit = 1u << entry;
+	uint32 all_bits = (1u << MMU_ATC_ENTRIES) - 1;
+
+	m68ki_cpu.mmu_atc_history |= bit;
+
+	/* If all bits would be set, clear others and keep only this entry */
+	if (m68ki_cpu.mmu_atc_history == all_bits)
+	{
+		m68ki_cpu.mmu_atc_history = bit;
+	}
+}
+
+/* pmmu_atc_find_victim: find entry to evict using PLRU */
+static int pmmu_atc_find_victim(void)
+{
+	int i;
+	for (i = 0; i < MMU_ATC_ENTRIES; i++)
+	{
+		if (!(m68ki_cpu.mmu_atc_history & (1u << i)))
+		{
+			return i;
+		}
+	}
+	/* All bits set (shouldn't happen), return 0 */
+	return 0;
+}
+
 /* pmmu_atc_add: adds this address to the ATC */
 static void pmmu_atc_add(uint32 logical, uint32 physical, int fc, int rw)
 {
-	int ps = (m68ki_cpu.mmu_tc >> 20) & 0xf;
+	int ps = (m68ki_cpu.mmu_tc >> 24) & 0xf;  /* PS: bits 27-24 */
 	uint32 atc_tag = M68K_MMU_ATC_VALID | ((fc & 7) << 24) | ((logical >> ps) << (ps - 8));
 	uint32 atc_data = (physical >> ps) << (ps - 8);
 	int i, found;
@@ -162,6 +196,7 @@ static void pmmu_atc_add(uint32 logical, uint32 physical, int fc, int rw)
 		if (m68ki_cpu.mmu_atc_tag[i] == atc_tag)
 		{
 			m68ki_cpu.mmu_atc_data[i] = atc_data;
+			pmmu_atc_update_history(i);
 			return;
 		}
 	}
@@ -177,22 +212,20 @@ static void pmmu_atc_add(uint32 logical, uint32 physical, int fc, int rw)
 		}
 	}
 
-	/* No empty entry? Use round-robin replacement */
+	/* No empty entry? Use PLRU to find victim */
 	if (found == -1)
 	{
-		found = m68ki_cpu.mmu_atc_rr++;
-		if (m68ki_cpu.mmu_atc_rr >= MMU_ATC_ENTRIES)
-		{
-			m68ki_cpu.mmu_atc_rr = 0;
-		}
+		found = pmmu_atc_find_victim();
 	}
 
-	/* Add the entry */
 	m68ki_cpu.mmu_atc_tag[found] = atc_tag;
 	m68ki_cpu.mmu_atc_data[found] = atc_data;
+	pmmu_atc_update_history(found);
+
+	/* Co-sim: notify ATC insert */
+	m68ki_mmu_cosim_atc(M68K_MMU_ATC_INSERT, logical, physical);
 }
 
-/* pmmu_atc_flush: flush entire ATC */
 static void pmmu_atc_flush(void)
 {
 	int i;
@@ -200,7 +233,10 @@ static void pmmu_atc_flush(void)
 	{
 		m68ki_cpu.mmu_atc_tag[i] = 0;
 	}
-	m68ki_cpu.mmu_atc_rr = 0;
+	m68ki_cpu.mmu_atc_history = 0;
+
+	/* Co-sim: notify ATC flush all */
+	m68ki_mmu_cosim_atc(M68K_MMU_ATC_FLUSH_ALL, 0, 0);
 }
 
 /* ======================================================================== */
@@ -254,7 +290,7 @@ static void pmmu_atc_flush_fc_ea(uint16 modes)
 {
 	int fcmask = (modes >> 5) & 7;
 	int fc = pmmu_get_fc(modes) & fcmask;
-	int ps = (m68ki_cpu.mmu_tc >> 20) & 0xf;
+	int ps = (m68ki_cpu.mmu_tc >> 24) & 0xf;  /* PS: bits 27-24 */
 	int mode = (modes >> 10) & 7;
 	uint32 ea;
 	int i;
@@ -277,17 +313,21 @@ static void pmmu_atc_flush_fc_ea(uint16 modes)
 		break;
 
 	case 6: /* flush by fc + ea */
+	{
+		uint32 ea_page;
 		ea = pmmu_decode_ea_32(m68ki_cpu.ir);
+		ea_page = ((ea >> ps) << (ps - 8)) & 0x00FFFFFF;
 		for (i = 0; i < MMU_ATC_ENTRIES; i++)
 		{
 			if ((m68ki_cpu.mmu_atc_tag[i] & M68K_MMU_ATC_VALID) &&
 			    (((m68ki_cpu.mmu_atc_tag[i] >> 24) & fcmask) == (uint32)fc) &&
-			    ((m68ki_cpu.mmu_atc_tag[i] << ps) == (ea >> 8 << ps)))
+			    ((m68ki_cpu.mmu_atc_tag[i] & 0x00FFFFFF) == ea_page))
 			{
 				m68ki_cpu.mmu_atc_tag[i] = 0;
 			}
 		}
 		break;
+	}
 
 	default:
 		break;
@@ -300,7 +340,7 @@ static void pmmu_atc_flush_fc_ea(uint16 modes)
  */
 static int pmmu_atc_lookup(uint32 addr_in, int fc, int rw, int ptest, uint32 *addr_out)
 {
-	int ps = (m68ki_cpu.mmu_tc >> 20) & 0xf;
+	int ps = (m68ki_cpu.mmu_tc >> 24) & 0xf;  /* PS: bits 27-24 */
 	uint32 atc_tag = M68K_MMU_ATC_VALID | ((fc & 7) << 24) | ((addr_in >> ps) << (ps - 8));
 	int i;
 
@@ -341,6 +381,9 @@ static int pmmu_atc_lookup(uint32 addr_in, int fc, int rw, int ptest, uint32 *ad
 		{
 			m68ki_cpu.mmu_tmp_sr |= M68K_MMU_SR_BUS_ERROR | M68K_MMU_SR_INVALID;
 		}
+
+		/* Update PLRU history on hit */
+		pmmu_atc_update_history(i);
 
 		*addr_out = (atc_data << 8) | (addr_in & ~(~0u << ps));
 		return 1;
@@ -477,9 +520,9 @@ static int pmmu_walk_tables(uint32 addr_in, int type, uint32 table, int fc,
                             int limit, int rw, int ptest, uint32 *addr_out)
 {
 	int level = 0;
-	uint32 bits = m68ki_cpu.mmu_tc & 0xffff;
-	int pagesize = (m68ki_cpu.mmu_tc >> 20) & 0xf;
-	int is = (m68ki_cpu.mmu_tc >> 16) & 0xf;
+	uint32 bits = m68ki_cpu.mmu_tc & 0xffff;   /* TIA/TIB/TIC/TID */
+	int pagesize = (m68ki_cpu.mmu_tc >> 24) & 0xf;  /* PS: bits 27-24 */
+	int is = (m68ki_cpu.mmu_tc >> 20) & 0xf;        /* IS: bits 23-20 */
 	int bitpos = 12;
 	int resolved = 0;
 	int pageshift = is;
@@ -642,6 +685,11 @@ static uint32 pmmu_translate_addr_with_fc(uint32 addr_in, uint8 fc, int rw, int 
 		{
 			pmmu_set_buserror(addr_in);
 		}
+
+		/* Co-sim: notify translation complete (ATC hit path) */
+		m68ki_mmu_cosim_translate(addr_in, addr_out, fc, rw ? 0 : 1, 0, 1,
+			m68ki_cpu.mmu_tmp_sr);
+
 		return addr_out;
 	}
 
@@ -682,6 +730,10 @@ static uint32 pmmu_translate_addr_with_fc(uint32 addr_in, uint8 fc, int rw, int 
 	/* Add to ATC */
 	pmmu_atc_add(addr_in, addr_out, fc, rw && type != 1);
 
+	/* Co-sim: notify translation complete (table walk path) */
+	m68ki_mmu_cosim_translate(addr_in, addr_out, fc, rw ? 0 : 1, 0, 0,
+		m68ki_cpu.mmu_tmp_sr);
+
 	return addr_out;
 }
 
@@ -701,6 +753,7 @@ static uint32 pmmu_translate_addr_with_fc_040(uint32 addr_in, uint8 fc, int ptes
 
 	addr_out = addr_in;
 	m68ki_cpu.mmu_tmp_sr = 0;
+	m68ki_cpu.mmu_last_logical_addr = addr_in;
 
 	/* Select TT registers based on access type */
 	if (fc & 1)  /* Data access, use DTT0/DTT1 */
@@ -1029,10 +1082,7 @@ static void m68851_pmove_get(uint32 ea, uint16 modes)
 		break;
 	}
 
-	if (!(modes & 0x100))  /* Flush ATC on moves to TC, SRP, CRP, TT with FD bit clear */
-	{
-		pmmu_atc_flush();
-	}
+	/* Note: PMOVE from register does NOT flush ATC - only PMOVE to register can flush */
 }
 
 /* m68851_pmove_put: PMOVE to MMU register */
@@ -1063,14 +1113,33 @@ static void m68851_pmove_put(uint32 ea, uint16 modes)
 		switch ((modes >> 10) & 7)
 		{
 		case 0:  /* Translation control register */
-			m68ki_cpu.mmu_tc = READ_EA_32(ea);
+		{
+			uint32 tc_val = READ_EA_32(ea);
 
-			if (m68ki_cpu.mmu_tc & 0x80000000)
+			if (tc_val & 0x80000000)
 			{
+				/* Validate TC: IS + TIA + TIB + TIC + TID + PS must equal 32 */
+				uint ps  = (tc_val >> 24) & 0x0F;
+				uint is  = (tc_val >> 20) & 0x0F;
+				uint tia = (tc_val >> 16) & 0x0F;
+				uint tib = (tc_val >> 12) & 0x0F;
+				uint tic = (tc_val >> 8)  & 0x0F;
+				uint tid = (tc_val >> 4)  & 0x0F;
+
+				/* PS must be 8-15 (256B to 32KB pages), and sum must equal 32 */
+				if (ps < 8 || is + tia + tib + tic + tid + ps != 32)
+				{
+					/* Configuration error - vector 56 (0xE0) */
+					m68ki_exception_trap(56);
+					return;
+				}
+
+				m68ki_cpu.mmu_tc = tc_val;
 				m68ki_cpu.pmmu_enabled = 1;
 			}
 			else
 			{
+				m68ki_cpu.mmu_tc = tc_val;
 				m68ki_cpu.pmmu_enabled = 0;
 			}
 
@@ -1079,6 +1148,7 @@ static void m68851_pmove_put(uint32 ea, uint16 modes)
 				pmmu_atc_flush();
 			}
 			break;
+		}
 
 		case 2:  /* Supervisor root pointer */
 			temp64 = READ_EA_64(ea);

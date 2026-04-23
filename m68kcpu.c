@@ -799,6 +799,42 @@ void m68k_set_instr_hook_callback(void  (*callback)(unsigned int pc))
 	CALLBACK_INSTR_HOOK = callback ? callback : default_instr_hook_callback;
 }
 
+#if M68K_EMULATE_PMMU && M68K_MMU_COSIM
+void m68k_set_mmu_translate_callback(void (*callback)(unsigned int, unsigned int,
+	unsigned char, unsigned char, unsigned char, unsigned char, unsigned short))
+{
+	CALLBACK_MMU_TRANSLATE = callback;
+}
+
+void m68k_set_mmu_atc_callback(void (*callback)(int, unsigned int, unsigned int))
+{
+	CALLBACK_MMU_ATC = callback;
+}
+
+void m68k_set_mmu_fault_callback(void (*callback)(unsigned int, unsigned char,
+	unsigned char, unsigned char))
+{
+	CALLBACK_MMU_FAULT = callback;
+}
+
+int m68k_get_atc_entries(m68k_atc_entry *entries, int max_entries)
+{
+	int i, count = 0;
+	if (!entries || max_entries <= 0)
+		return 0;
+	for (i = 0; i < MMU_ATC_ENTRIES && count < max_entries; i++)
+	{
+		if (m68ki_cpu.mmu_atc_tag[i] & M68K_MMU_ATC_VALID)
+		{
+			entries[count].tag = m68ki_cpu.mmu_atc_tag[i];
+			entries[count].data = m68ki_cpu.mmu_atc_data[i];
+			count++;
+		}
+	}
+	return count;
+}
+#endif /* M68K_EMULATE_PMMU && M68K_MMU_COSIM */
+
 /* Set the CPU type. */
 void m68k_set_cpu_type(unsigned int cpu_type)
 {
@@ -1183,6 +1219,12 @@ void m68k_init(void)
 	m68k_set_pc_changed_callback(NULL);
 	m68k_set_fc_callback(NULL);
 	m68k_set_instr_hook_callback(NULL);
+
+#if M68K_EMULATE_PMMU && M68K_MMU_COSIM
+	m68k_set_mmu_translate_callback(NULL);
+	m68k_set_mmu_atc_callback(NULL);
+	m68k_set_mmu_fault_callback(NULL);
+#endif
 }
 
 /* Trigger a Bus Error exception */
@@ -1197,14 +1239,18 @@ void m68k_pulse_reset(void)
 	/* Disable the PMMU on reset */
 	m68ki_cpu.pmmu_enabled = 0;
 
-	/* Clear MMU translation state */
+	/* Clear MMU translation state (68030-style registers) */
 	m68ki_cpu.mmu_tt0 = 0;
 	m68ki_cpu.mmu_tt1 = 0;
 	m68ki_cpu.mmu_tc = 0;
+	m68ki_cpu.mmu_crp_aptr = 0;
+	m68ki_cpu.mmu_crp_limit = 0;
+	m68ki_cpu.mmu_srp_aptr = 0;
+	m68ki_cpu.mmu_srp_limit = 0;
 	m68ki_cpu.mmu_sr = 0;
 	m68ki_cpu.mmu_tmp_buserror_occurred = 0;
 	m68ki_cpu.mmu_tablewalk = 0;
-	m68ki_cpu.mmu_atc_rr = 0;
+	m68ki_cpu.mmu_atc_history = 0;
 	{
 		int i;
 		for (i = 0; i < MMU_ATC_ENTRIES; i++) {

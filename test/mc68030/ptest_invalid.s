@@ -35,7 +35,7 @@ op_PTEST_INVALID:
     mov.l   #0x00000000, PT_ROOT+(0x10*4)   | Type 0 = invalid
 
     * Enable MMU
-    mov.l   #0x80808880, TC_DATA
+    mov.l   #0x88088800, TC_DATA
     lea     TC_DATA, %a0
     .word   0xF010
     .word   0x4000

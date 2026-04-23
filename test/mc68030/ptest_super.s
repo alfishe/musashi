@@ -44,7 +44,7 @@ op_PTEST_SUPER:
     mov.l   #0x10000000, PT_LEVEL_A+4         | Physical address
 
     * Enable MMU
-    mov.l   #0x80808880, TC_DATA
+    mov.l   #0x88088800, TC_DATA
     lea     TC_DATA, %a0
     .word   0xF010
     .word   0x4000

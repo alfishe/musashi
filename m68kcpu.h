@@ -416,6 +416,24 @@ typedef uint32 uint64;
 #define CALLBACK_SET_FC      m68ki_cpu.set_fc_callback
 #define CALLBACK_INSTR_HOOK  m68ki_cpu.instr_hook_callback
 
+/* MMU co-simulation callback macros */
+#if M68K_EMULATE_PMMU && M68K_MMU_COSIM
+	#define CALLBACK_MMU_TRANSLATE  m68ki_cpu.mmu_translate_callback
+	#define CALLBACK_MMU_ATC        m68ki_cpu.mmu_atc_callback
+	#define CALLBACK_MMU_FAULT      m68ki_cpu.mmu_fault_callback
+
+	#define m68ki_mmu_cosim_translate(la, pa, fc, at, cm, from_atc, sr) \
+		do { if(CALLBACK_MMU_TRANSLATE) CALLBACK_MMU_TRANSLATE(la, pa, fc, at, cm, from_atc, sr); } while(0)
+	#define m68ki_mmu_cosim_atc(op, la, pa) \
+		do { if(CALLBACK_MMU_ATC) CALLBACK_MMU_ATC(op, la, pa); } while(0)
+	#define m68ki_mmu_cosim_fault(fa, fc, at, ft) \
+		do { if(CALLBACK_MMU_FAULT) CALLBACK_MMU_FAULT(fa, fc, at, ft); } while(0)
+#else
+	#define m68ki_mmu_cosim_translate(la, pa, fc, at, cm, from_atc, sr)
+	#define m68ki_mmu_cosim_atc(op, la, pa)
+	#define m68ki_mmu_cosim_fault(fa, fc, at, ft)
+#endif /* M68K_EMULATE_PMMU && M68K_MMU_COSIM */
+
 
 
 /* ----------------------------- Configuration ---------------------------- */
@@ -1035,7 +1053,7 @@ typedef struct
 #define MMU_ATC_ENTRIES 22
 	uint mmu_atc_tag[MMU_ATC_ENTRIES];   /* Valid|FC|logical page */
 	uint mmu_atc_data[MMU_ATC_ENTRIES];  /* Physical page + flags */
-	int  mmu_atc_rr;                     /* Round-robin replacement index */
+	uint mmu_atc_history;                /* PLRU history (bit per entry) */
 
 	/* MMU temporary state (used during table walk / translation) */
 	uint16 mmu_tmp_sr;         /* Accumulated status during walk */
@@ -1074,6 +1092,16 @@ typedef struct
 	void (*pc_changed_callback)(unsigned int new_pc); /* Called when the PC changes by a large amount */
 	void (*set_fc_callback)(unsigned int new_fc);     /* Called when the CPU function code changes */
 	void (*instr_hook_callback)(unsigned int pc);     /* Called every instruction cycle prior to execution */
+
+#if M68K_EMULATE_PMMU && M68K_MMU_COSIM
+	/* MMU co-simulation callbacks (compiled out when M68K_MMU_COSIM is OFF) */
+	void (*mmu_translate_callback)(unsigned int logical_addr, unsigned int physical_addr,
+		unsigned char fc, unsigned char access_type, unsigned char cache_mode,
+		unsigned char from_atc, unsigned short mmusr);
+	void (*mmu_atc_callback)(int operation, unsigned int logical_addr, unsigned int physical_addr);
+	void (*mmu_fault_callback)(unsigned int fault_addr, unsigned char fc,
+		unsigned char access_type, unsigned char fault_type);
+#endif
 
 } m68ki_cpu_core;
 
@@ -1117,33 +1145,80 @@ extern uint pmmu_translate_addr(uint addr_in);
  */
 static inline uint m68ki_read_imm_16(void)
 {
-	m68ki_set_fc(FLAG_S | FUNCTION_CODE_USER_PROGRAM); /* auto-disable (see m68kcpu.h) */
-	m68ki_check_address_error(REG_PC, MODE_READ, FLAG_S | FUNCTION_CODE_USER_PROGRAM); /* auto-disable (see m68kcpu.h) */
-
-#if M68K_SEPARATE_READS
-#if M68K_EMULATE_PMMU
-	if (PMMU_ENABLED)
-	    address = pmmu_translate_addr(address);
-#endif
-#endif
+	uint fc = FLAG_S | FUNCTION_CODE_USER_PROGRAM;
+	m68ki_set_fc(fc); /* auto-disable (see m68kcpu.h) */
+	m68ki_check_address_error(REG_PC, MODE_READ, fc); /* auto-disable (see m68kcpu.h) */
 
 #if M68K_EMULATE_PREFETCH
 {
 	uint result;
+	uint phys_addr;
 	if(REG_PC != CPU_PREF_ADDR)
 	{
 		CPU_PREF_ADDR = REG_PC;
-		CPU_PREF_DATA = m68k_read_immediate_16(ADDRESS_68K(CPU_PREF_ADDR));
+#if M68K_EMULATE_PMMU
+		if (PMMU_ENABLED)
+		{
+			m68ki_cpu.mmu_tmp_fc = fc;
+			m68ki_cpu.mmu_tmp_rw = 1;
+			m68ki_cpu.mmu_tmp_sz = 2;
+			phys_addr = pmmu_translate_addr(CPU_PREF_ADDR);
+			if (m68ki_cpu.mmu_tmp_buserror_occurred)
+			{
+				m68ki_cpu.mmu_tmp_buserror_occurred = 0;
+				m68ki_exception_bus_error();
+				return 0;
+			}
+		}
+		else
+#endif
+			phys_addr = CPU_PREF_ADDR;
+		CPU_PREF_DATA = m68k_read_immediate_16(ADDRESS_68K(phys_addr));
 	}
 	result = MASK_OUT_ABOVE_16(CPU_PREF_DATA);
 	REG_PC += 2;
 	CPU_PREF_ADDR = REG_PC;
-	CPU_PREF_DATA = m68k_read_immediate_16(ADDRESS_68K(CPU_PREF_ADDR));
+#if M68K_EMULATE_PMMU
+	if (PMMU_ENABLED)
+	{
+		m68ki_cpu.mmu_tmp_fc = fc;
+		m68ki_cpu.mmu_tmp_rw = 1;
+		m68ki_cpu.mmu_tmp_sz = 2;
+		phys_addr = pmmu_translate_addr(CPU_PREF_ADDR);
+		if (m68ki_cpu.mmu_tmp_buserror_occurred)
+		{
+			m68ki_cpu.mmu_tmp_buserror_occurred = 0;
+			m68ki_exception_bus_error();
+			return 0;
+		}
+	}
+	else
+#endif
+		phys_addr = CPU_PREF_ADDR;
+	CPU_PREF_DATA = m68k_read_immediate_16(ADDRESS_68K(phys_addr));
 	return result;
 }
 #else
+{
+	uint addr = REG_PC;
 	REG_PC += 2;
-	return m68k_read_immediate_16(ADDRESS_68K(REG_PC-2));
+#if M68K_EMULATE_PMMU
+	if (PMMU_ENABLED)
+	{
+		m68ki_cpu.mmu_tmp_fc = fc;
+		m68ki_cpu.mmu_tmp_rw = 1;
+		m68ki_cpu.mmu_tmp_sz = 2;
+		addr = pmmu_translate_addr(addr);
+		if (m68ki_cpu.mmu_tmp_buserror_occurred)
+		{
+			m68ki_cpu.mmu_tmp_buserror_occurred = 0;
+			m68ki_exception_bus_error();
+			return 0;
+		}
+	}
+#endif
+	return m68k_read_immediate_16(ADDRESS_68K(addr));
+}
 #endif /* M68K_EMULATE_PREFETCH */
 }
 
@@ -1155,40 +1230,105 @@ static inline uint m68ki_read_imm_8(void)
 
 static inline uint m68ki_read_imm_32(void)
 {
-#if M68K_SEPARATE_READS
-#if M68K_EMULATE_PMMU
-	if (PMMU_ENABLED)
-	    address = pmmu_translate_addr(address);
-#endif
-#endif
+	uint fc = FLAG_S | FUNCTION_CODE_USER_PROGRAM;
 
 #if M68K_EMULATE_PREFETCH
 	uint temp_val;
+	uint phys_addr;
 
-	m68ki_set_fc(FLAG_S | FUNCTION_CODE_USER_PROGRAM); /* auto-disable (see m68kcpu.h) */
-	m68ki_check_address_error(REG_PC, MODE_READ, FLAG_S | FUNCTION_CODE_USER_PROGRAM); /* auto-disable (see m68kcpu.h) */
+	m68ki_set_fc(fc); /* auto-disable (see m68kcpu.h) */
+	m68ki_check_address_error(REG_PC, MODE_READ, fc); /* auto-disable (see m68kcpu.h) */
 
 	if(REG_PC != CPU_PREF_ADDR)
 	{
 		CPU_PREF_ADDR = REG_PC;
-		CPU_PREF_DATA = m68k_read_immediate_16(ADDRESS_68K(CPU_PREF_ADDR));
+#if M68K_EMULATE_PMMU
+		if (PMMU_ENABLED)
+		{
+			m68ki_cpu.mmu_tmp_fc = fc;
+			m68ki_cpu.mmu_tmp_rw = 1;
+			m68ki_cpu.mmu_tmp_sz = 2;
+			phys_addr = pmmu_translate_addr(CPU_PREF_ADDR);
+			if (m68ki_cpu.mmu_tmp_buserror_occurred)
+			{
+				m68ki_cpu.mmu_tmp_buserror_occurred = 0;
+				m68ki_exception_bus_error();
+				return 0;
+			}
+		}
+		else
+#endif
+			phys_addr = CPU_PREF_ADDR;
+		CPU_PREF_DATA = m68k_read_immediate_16(ADDRESS_68K(phys_addr));
 	}
 	temp_val = MASK_OUT_ABOVE_16(CPU_PREF_DATA);
 	REG_PC += 2;
 	CPU_PREF_ADDR = REG_PC;
-	CPU_PREF_DATA = m68k_read_immediate_16(ADDRESS_68K(CPU_PREF_ADDR));
+#if M68K_EMULATE_PMMU
+	if (PMMU_ENABLED)
+	{
+		m68ki_cpu.mmu_tmp_fc = fc;
+		m68ki_cpu.mmu_tmp_rw = 1;
+		m68ki_cpu.mmu_tmp_sz = 2;
+		phys_addr = pmmu_translate_addr(CPU_PREF_ADDR);
+		if (m68ki_cpu.mmu_tmp_buserror_occurred)
+		{
+			m68ki_cpu.mmu_tmp_buserror_occurred = 0;
+			m68ki_exception_bus_error();
+			return 0;
+		}
+	}
+	else
+#endif
+		phys_addr = CPU_PREF_ADDR;
+	CPU_PREF_DATA = m68k_read_immediate_16(ADDRESS_68K(phys_addr));
 
 	temp_val = MASK_OUT_ABOVE_32((temp_val << 16) | MASK_OUT_ABOVE_16(CPU_PREF_DATA));
 	REG_PC += 2;
 	CPU_PREF_ADDR = REG_PC;
-	CPU_PREF_DATA = m68k_read_immediate_16(ADDRESS_68K(CPU_PREF_ADDR));
+#if M68K_EMULATE_PMMU
+	if (PMMU_ENABLED)
+	{
+		m68ki_cpu.mmu_tmp_fc = fc;
+		m68ki_cpu.mmu_tmp_rw = 1;
+		m68ki_cpu.mmu_tmp_sz = 2;
+		phys_addr = pmmu_translate_addr(CPU_PREF_ADDR);
+		if (m68ki_cpu.mmu_tmp_buserror_occurred)
+		{
+			m68ki_cpu.mmu_tmp_buserror_occurred = 0;
+			m68ki_exception_bus_error();
+			return 0;
+		}
+	}
+	else
+#endif
+		phys_addr = CPU_PREF_ADDR;
+	CPU_PREF_DATA = m68k_read_immediate_16(ADDRESS_68K(phys_addr));
 
 	return temp_val;
 #else
-	m68ki_set_fc(FLAG_S | FUNCTION_CODE_USER_PROGRAM); /* auto-disable (see m68kcpu.h) */
-	m68ki_check_address_error(REG_PC, MODE_READ, FLAG_S | FUNCTION_CODE_USER_PROGRAM); /* auto-disable (see m68kcpu.h) */
+{
+	uint addr = REG_PC;
+	m68ki_set_fc(fc); /* auto-disable (see m68kcpu.h) */
+	m68ki_check_address_error(REG_PC, MODE_READ, fc); /* auto-disable (see m68kcpu.h) */
 	REG_PC += 4;
-	return m68k_read_immediate_32(ADDRESS_68K(REG_PC-4));
+#if M68K_EMULATE_PMMU
+	if (PMMU_ENABLED)
+	{
+		m68ki_cpu.mmu_tmp_fc = fc;
+		m68ki_cpu.mmu_tmp_rw = 1;
+		m68ki_cpu.mmu_tmp_sz = 4;
+		addr = pmmu_translate_addr(addr);
+		if (m68ki_cpu.mmu_tmp_buserror_occurred)
+		{
+			m68ki_cpu.mmu_tmp_buserror_occurred = 0;
+			m68ki_exception_bus_error();
+			return 0;
+		}
+	}
+#endif
+	return m68k_read_immediate_32(ADDRESS_68K(addr));
+}
 #endif /* M68K_EMULATE_PREFETCH */
 }
 
@@ -1212,6 +1352,12 @@ static inline uint m68ki_read_8_fc(uint address, uint fc)
 		m68ki_cpu.mmu_tmp_rw = 1;
 		m68ki_cpu.mmu_tmp_sz = 1;
 		address = pmmu_translate_addr(address);
+		if (m68ki_cpu.mmu_tmp_buserror_occurred)
+		{
+			m68ki_cpu.mmu_tmp_buserror_occurred = 0;
+			m68ki_exception_bus_error();
+			return 0;
+		}
 	}
 #endif
 
@@ -1230,6 +1376,12 @@ static inline uint m68ki_read_16_fc(uint address, uint fc)
 		m68ki_cpu.mmu_tmp_rw = 1;
 		m68ki_cpu.mmu_tmp_sz = 2;
 		address = pmmu_translate_addr(address);
+		if (m68ki_cpu.mmu_tmp_buserror_occurred)
+		{
+			m68ki_cpu.mmu_tmp_buserror_occurred = 0;
+			m68ki_exception_bus_error();
+			return 0;
+		}
 	}
 #endif
 
@@ -1248,6 +1400,12 @@ static inline uint m68ki_read_32_fc(uint address, uint fc)
 		m68ki_cpu.mmu_tmp_rw = 1;
 		m68ki_cpu.mmu_tmp_sz = 4;
 		address = pmmu_translate_addr(address);
+		if (m68ki_cpu.mmu_tmp_buserror_occurred)
+		{
+			m68ki_cpu.mmu_tmp_buserror_occurred = 0;
+			m68ki_exception_bus_error();
+			return 0;
+		}
 	}
 #endif
 
@@ -1845,7 +2003,10 @@ static inline void m68ki_stack_frame_1000(uint pc, uint sr, uint vector)
  * if the error happens at an instruction boundary.
  * PC stacked is address of next instruction.
  */
-static inline void m68ki_stack_frame_1010(uint sr, uint vector, uint pc)
+/* Format A stack frame (short bus fault) for 68020/030.
+ * Used for instruction pipe faults.
+ */
+static inline void m68ki_stack_frame_1010(uint sr, uint vector, uint pc, uint fault_addr, uint ssw)
 {
 	/* INTERNAL REGISTER */
 	m68ki_push_16(0);
@@ -1863,7 +2024,7 @@ static inline void m68ki_stack_frame_1010(uint sr, uint vector, uint pc)
 	m68ki_push_16(0);
 
 	/* DATA CYCLE FAULT ADDRESS (2 words) */
-	m68ki_push_32(0);
+	m68ki_push_32(fault_addr);
 
 	/* INSTRUCTION PIPE STAGE B */
 	m68ki_push_16(0);
@@ -1872,7 +2033,7 @@ static inline void m68ki_stack_frame_1010(uint sr, uint vector, uint pc)
 	m68ki_push_16(0);
 
 	/* SPECIAL STATUS REGISTER */
-	m68ki_push_16(0);
+	m68ki_push_16(ssw);
 
 	/* INTERNAL REGISTER */
 	m68ki_push_16(0);
@@ -1887,12 +2048,11 @@ static inline void m68ki_stack_frame_1010(uint sr, uint vector, uint pc)
 	m68ki_push_16(sr);
 }
 
-/* Format B stack frame (long bus fault).
- * This is used only by 68020 for bus fault and address error
- * if the error happens during instruction execution.
+/* Format B stack frame (long bus fault) for 68020/030.
+ * Used for data faults during instruction execution.
  * PC stacked is address of instruction in progress.
  */
-static inline void m68ki_stack_frame_1011(uint sr, uint vector, uint pc)
+static inline void m68ki_stack_frame_1011(uint sr, uint vector, uint pc, uint fault_addr, uint ssw)
 {
 	/* INTERNAL REGISTERS (18 words) */
 	m68ki_push_32(0);
@@ -1912,7 +2072,7 @@ static inline void m68ki_stack_frame_1011(uint sr, uint vector, uint pc)
 	m68ki_push_32(0);
 	m68ki_push_16(0);
 
-	/* DATA INTPUT BUFFER (2 words) */
+	/* DATA INPUT BUFFER (2 words) */
 	m68ki_push_32(0);
 
 	/* INTERNAL REGISTERS (2 words) */
@@ -1935,7 +2095,7 @@ static inline void m68ki_stack_frame_1011(uint sr, uint vector, uint pc)
 	m68ki_push_16(0);
 
 	/* DATA CYCLE FAULT ADDRESS (2 words) */
-	m68ki_push_32(0);
+	m68ki_push_32(fault_addr);
 
 	/* INSTRUCTION PIPE STAGE B */
 	m68ki_push_16(0);
@@ -1944,7 +2104,7 @@ static inline void m68ki_stack_frame_1011(uint sr, uint vector, uint pc)
 	m68ki_push_16(0);
 
 	/* SPECIAL STATUS REGISTER */
-	m68ki_push_16(0);
+	m68ki_push_16(ssw);
 
 	/* INTERNAL REGISTER */
 	m68ki_push_16(0);
@@ -2074,8 +2234,39 @@ static inline void m68ki_exception_bus_error(void)
 
 	uint sr = m68ki_init_exception();
 
-	/* Note: This is implemented for 68010 only! */
-	m68ki_stack_frame_1000(REG_PPC, sr, EXCEPTION_BUS_ERROR);
+	if (CPU_TYPE_IS_010_LESS(CPU_TYPE))
+	{
+		/* 68010: Format $8 (29-word frame) */
+		m68ki_stack_frame_1000(REG_PPC, sr, EXCEPTION_BUS_ERROR);
+	}
+	else if (CPU_TYPE_IS_EC020_PLUS(CPU_TYPE))
+	{
+		/* 68020/030: Build SSW and choose Format $A or $B */
+		uint ssw = 0;
+		uint fault_addr = m68ki_cpu.mmu_tmp_buserror_address;
+
+		/* FC field (bits 15-12) - function code of faulting access */
+		ssw |= (m68ki_cpu.mmu_tmp_buserror_fc & 7) << 12;
+
+		/* DF (bit 7) - Data Fault (vs instruction) */
+		ssw |= 0x0080;  /* Assume data fault */
+
+		/* RW (bit 5) - Read/Write: 1=read, 0=write */
+		if (m68ki_cpu.mmu_tmp_buserror_rw)
+			ssw |= 0x0020;
+
+		/* Size field (bits 4-3): 00=long, 01=byte, 10=word, 11=line */
+		switch (m68ki_cpu.mmu_tmp_buserror_sz)
+		{
+		case 1:  ssw |= 0x0008; break;  /* byte -> 01 */
+		case 2:  ssw |= 0x0010; break;  /* word -> 10 */
+		case 4:  ssw |= 0x0000; break;  /* long -> 00 */
+		default: ssw |= 0x0000; break;
+		}
+
+		/* Use Format $B (long) for data faults during instruction execution */
+		m68ki_stack_frame_1011(sr, EXCEPTION_BUS_ERROR, REG_PPC, fault_addr, ssw);
+	}
 
 	m68ki_jump_vector(EXCEPTION_BUS_ERROR);
 
