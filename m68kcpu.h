@@ -2121,6 +2121,75 @@ static inline void m68ki_stack_frame_1011(uint sr, uint vector, uint pc, uint fa
 	m68ki_push_16(sr);
 }
 
+/*
+ * Format $7 stack frame (68040 Access Error)
+ * 30 words total, per MC68040 User's Manual Section 8.4.2
+ *
+ * 68040 SSW layout (different from 030):
+ * Bit 12:   CP  — Continuation/Pending
+ * Bit 11:   CU  — Copyback/Update
+ * Bit 10:   CT  — Continuation/Transfer type
+ * Bit  9:   CM  — Completion/Misaligned
+ * Bit  8:   MA  — Misaligned Access
+ * Bit  7:   ATC — ATC Fault (vs bus error)
+ * Bit  6:   LK  — Locked transfer
+ * Bit  5:   RW  — Read/Write (1=read, 0=write)
+ * Bits 4-3: SIZ — Transfer size (00=long, 01=byte, 10=word, 11=line)
+ * Bits 2-0: TT  — Transfer type (000=normal, 001=MOVE16, 010=alt FC, 011=ACK)
+ */
+static inline void m68ki_stack_frame_0111(uint sr, uint vector, uint pc, uint fault_addr, uint ssw)
+{
+	/* INTERNAL REGISTERS (7 words) — zeroed for simplified model */
+	m68ki_push_32(0);  /* Internal register */
+	m68ki_push_32(0);  /* Internal register */
+	m68ki_push_16(0);  /* Internal register */
+
+	/* WRITE BACK DATA 3 (2 words) */
+	m68ki_push_32(0);
+
+	/* WRITE BACK DATA 2 (2 words) */
+	m68ki_push_32(0);
+
+	/* WRITE BACK DATA 1 (2 words) */
+	m68ki_push_32(0);
+
+	/* WRITE BACK ADDRESS 3 (2 words) */
+	m68ki_push_32(0);
+
+	/* WRITE BACK ADDRESS 2 (2 words) */
+	m68ki_push_32(0);
+
+	/* WRITE BACK ADDRESS 1 (2 words) */
+	m68ki_push_32(0);
+
+	/* WRITE BACK STATUS 3 */
+	m68ki_push_16(0);
+
+	/* WRITE BACK STATUS 2 */
+	m68ki_push_16(0);
+
+	/* WRITE BACK STATUS 1 */
+	m68ki_push_16(0);
+
+	/* FAULT ADDRESS (2 words) */
+	m68ki_push_32(fault_addr);
+
+	/* EFFECTIVE ADDRESS (2 words) */
+	m68ki_push_32(fault_addr);
+
+	/* SPECIAL STATUS WORD */
+	m68ki_push_16(ssw);
+
+	/* 0111, VECTOR OFFSET */
+	m68ki_push_16(0x7000 | (vector<<2));
+
+	/* PROGRAM COUNTER */
+	m68ki_push_32(pc);
+
+	/* STATUS REGISTER */
+	m68ki_push_16(sr);
+}
+
 
 /* Used for Group 2 exceptions.
  * These stack a type 2 frame on the 020.
@@ -2240,6 +2309,31 @@ static inline void m68ki_exception_bus_error(void)
 	{
 		/* 68010: Format $8 (29-word frame) */
 		m68ki_stack_frame_1000(REG_PPC, sr, EXCEPTION_BUS_ERROR);
+	}
+	else if (CPU_TYPE_IS_040_PLUS(CPU_TYPE))
+	{
+		/* 68040/060: Build 040-style SSW and use Format $7 */
+		uint ssw = 0;
+		uint fault_addr = m68ki_cpu.mmu_tmp_buserror_address;
+
+		/* ATC (bit 7) - set if fault was from ATC (translation fault) */
+		ssw |= 0x0080;
+
+		/* RW (bit 5) - Read/Write: 1=read, 0=write */
+		if (m68ki_cpu.mmu_tmp_buserror_rw)
+			ssw |= 0x0020;
+
+		/* SIZ (bits 4-3): 00=long, 01=byte, 10=word, 11=line */
+		switch (m68ki_cpu.mmu_tmp_buserror_sz)
+		{
+		case 1:  ssw |= 0x0008; break;  /* byte -> 01 */
+		case 2:  ssw |= 0x0010; break;  /* word -> 10 */
+		case 4:  ssw |= 0x0000; break;  /* long -> 00 */
+		default: ssw |= 0x0000; break;
+		}
+
+		/* TT (bits 2-0): 000 = normal access */
+		m68ki_stack_frame_0111(sr, EXCEPTION_BUS_ERROR, REG_PPC, fault_addr, ssw);
 	}
 	else if (CPU_TYPE_IS_EC020_PLUS(CPU_TYPE))
 	{

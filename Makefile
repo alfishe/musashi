@@ -51,7 +51,7 @@ TESTS_68040 = bfchg bfclr bfext bfffo bfins bfset bftst cas chk2 cmp2 \
 	divs_long divu_long interrupt jmp mul_long rtd shifts3 trapcc
 
 # 68040 MMU tests
-TESTS_68040_MMU = movec_tc movec_urp_srp mmu_simple tt_data walk_4k walk_8k \
+TESTS_68040_MMU = movec_tc movec_urp_srp mmu_simple tt_data itt_match walk_4k walk_8k \
 	ptest_wp ptest_super ptest_modified ptest_global pflusha pflush_page \
 	pflushn invalid_page cinv_cpush indirect_desc um_bits
 
@@ -105,4 +105,4 @@ $(TESTS_68030_RUN): test_driver$(EXE)
 
 build_tests:
 	@$(MAKE) -C test all
-test: $(TESTS_68000_RUN) $(TESTS_68010_RUN) $(TESTS_68030_RUN) $(TESTS_68040_RUN) $(TESTS_68040_MMU_RUN) $(TESTS_68060_RUN) $(TESTS_LC060_RUN) $(TESTS_EC060_RUN)
+test: build_tests test_driver$(EXE) $(TESTS_68000_RUN) $(TESTS_68010_RUN) $(TESTS_68030_RUN) $(TESTS_68040_RUN) $(TESTS_68040_MMU_RUN) $(TESTS_68060_RUN) $(TESTS_LC060_RUN) $(TESTS_EC060_RUN)

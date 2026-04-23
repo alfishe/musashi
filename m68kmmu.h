@@ -27,7 +27,20 @@
 #define M68K_MMU_SR_MODIFIED        0x0200
 #define M68K_MMU_SR_TRANSPARENT     0x0040
 
-/* 68040 MMUSR register fields (different layout from 68030) */
+/* 68040 MMUSR register fields (different layout from 68030)
+ * Per MC68040 User's Manual, Section 3:
+ * Bits 31:12 — Physical page address (4K), 31:13 (8K)
+ * Bit  9 — G (global)
+ * Bit  8 — U1 (user page attribute 1)
+ * Bit  7 — U0 (user page attribute 0)
+ * Bit  6 — S (supervisor only)
+ * Bit  5 — CM1 (cache mode bit 1)
+ * Bit  4 — CM0 (cache mode bit 0)
+ * Bit  3 — M (modified)
+ * Bit  2 — W (write protected)
+ * Bit  1 — T (transparent translation hit)
+ * Bit  0 — R (resident)
+ */
 #define M68K_MMU040_SR_RESIDENT     0x0001
 #define M68K_MMU040_SR_TRANSPARENT  0x0002
 #define M68K_MMU040_SR_WRITE_PROTECT 0x0004
@@ -35,7 +48,9 @@
 #define M68K_MMU040_SR_CM0          0x0010
 #define M68K_MMU040_SR_CM1          0x0020
 #define M68K_MMU040_SR_SUPERVISOR   0x0040
-#define M68K_MMU040_SR_GLOBAL       0x0080
+#define M68K_MMU040_SR_U0           0x0080
+#define M68K_MMU040_SR_U1           0x0100
+#define M68K_MMU040_SR_GLOBAL       0x0200
 #define M68K_MMU040_SR_BUS_ERROR    0x8000
 
 /* MMU translation table descriptor field definitions */
@@ -58,6 +73,8 @@
 #define M68K_MMU_ATC_WRITE_PR       0x02000000
 #define M68K_MMU_ATC_MODIFIED       0x01000000
 #define M68K_MMU_ATC_GLOBAL         0x00800000
+#define M68K_MMU_ATC_U0             0x00400000
+#define M68K_MMU_ATC_U1             0x00200000
 #define M68K_MMU_ATC_MASK           0x00ffffff
 #define M68K_MMU_ATC_SHIFT          8
 #define M68K_MMU_ATC_VALID          0x08000000
@@ -69,6 +86,8 @@
 #define M68K_MMU040_PD_CM0          0x00000020
 #define M68K_MMU040_PD_CM1          0x00000040
 #define M68K_MMU040_PD_SUPERVISOR   0x00000080
+#define M68K_MMU040_PD_U0           0x00000100
+#define M68K_MMU040_PD_U1           0x00000200
 #define M68K_MMU040_PD_GLOBAL       0x00000400
 
 /* MMU Translation Control register */
@@ -868,6 +887,14 @@ static int pmmu040_atc_lookup(uint32 addr_in, uint8 fc, int ptest, uint32 *addr_
 		{
 			m68ki_cpu.mmu_tmp_sr |= M68K_MMU040_SR_GLOBAL;
 		}
+		if (atc_data & M68K_MMU_ATC_U0)
+		{
+			m68ki_cpu.mmu_tmp_sr |= M68K_MMU040_SR_U0;
+		}
+		if (atc_data & M68K_MMU_ATC_U1)
+		{
+			m68ki_cpu.mmu_tmp_sr |= M68K_MMU040_SR_U1;
+		}
 
 		*addr_out = (atc_data << 8) | (addr_in & ~(~0u << ps));
 		return 1;
@@ -900,9 +927,17 @@ static void pmmu040_atc_add(uint32 logical, uint32 physical, uint8 fc, int rw, u
 	{
 		atc_data |= M68K_MMU_ATC_MODIFIED;
 	}
-	if (page_entry & M68K_MMU040_PD_GLOBAL)  /* G bit (68040) */
+	if (page_entry & M68K_MMU040_PD_GLOBAL)
 	{
 		atc_data |= M68K_MMU_ATC_GLOBAL;
+	}
+	if (page_entry & M68K_MMU040_PD_U0)
+	{
+		atc_data |= M68K_MMU_ATC_U0;
+	}
+	if (page_entry & M68K_MMU040_PD_U1)
+	{
+		atc_data |= M68K_MMU_ATC_U1;
 	}
 
 	/* Check if already in cache */
@@ -1011,6 +1046,11 @@ static uint32 pmmu_translate_addr_with_fc_040(uint32 addr_in, uint8 fc, int ptes
 			{
 				pmmu_set_buserror(addr_in);
 			}
+
+			/* Co-sim: notify translation complete (040 ATC hit path) */
+			m68ki_mmu_cosim_translate(addr_in, addr_out, fc,
+				m68ki_cpu.mmu_tmp_rw ? 0 : 1, 0, 1, m68ki_cpu.mmu_tmp_sr);
+
 			return addr_out;
 		}
 	}
@@ -1189,6 +1229,10 @@ static uint32 pmmu_translate_addr_with_fc_040(uint32 addr_in, uint8 fc, int ptes
 
 				/* Add to ATC */
 				pmmu040_atc_add(addr_in, addr_out, fc, m68ki_cpu.mmu_tmp_rw, page_entry);
+
+				/* Co-sim: notify translation complete (040 table walk path) */
+				m68ki_mmu_cosim_translate(addr_in, addr_out, fc,
+					m68ki_cpu.mmu_tmp_rw ? 0 : 1, 0, 0, m68ki_cpu.mmu_tmp_sr);
 			}
 			else
 			{
@@ -1213,6 +1257,8 @@ static uint32 pmmu_translate_addr_with_fc_040(uint32 addr_in, uint8 fc, int ptes
 				}
 				/* Map page entry bits to MMUSR bits */
 				if (page_entry & M68K_MMU040_PD_GLOBAL) m68ki_cpu.mmu_tmp_sr |= M68K_MMU040_SR_GLOBAL;
+				if (page_entry & M68K_MMU040_PD_U1) m68ki_cpu.mmu_tmp_sr |= M68K_MMU040_SR_U1;
+				if (page_entry & M68K_MMU040_PD_U0) m68ki_cpu.mmu_tmp_sr |= M68K_MMU040_SR_U0;
 				if (page_entry & M68K_MMU040_PD_SUPERVISOR) m68ki_cpu.mmu_tmp_sr |= M68K_MMU040_SR_SUPERVISOR;
 				if (page_entry & M68K_MMU040_PD_CM1) m68ki_cpu.mmu_tmp_sr |= M68K_MMU040_SR_CM1;
 				if (page_entry & M68K_MMU040_PD_CM0) m68ki_cpu.mmu_tmp_sr |= M68K_MMU040_SR_CM0;
@@ -1548,6 +1594,9 @@ void m68881_mmu_ops(void)
 				}
 			}
 		}
+
+		/* Co-sim: notify ATC flush */
+		m68ki_mmu_cosim_atc(M68K_MMU_ATC_FLUSH, addr, 0);
 	}
 	else if ((m68ki_cpu.ir & 0xfff8) == 0xf510)
 	{
@@ -1574,6 +1623,9 @@ void m68881_mmu_ops(void)
 				}
 			}
 		}
+
+		/* Co-sim: notify ATC flush (non-global) */
+		m68ki_mmu_cosim_atc(M68K_MMU_ATC_FLUSH, addr, 0);
 	}
 	else if ((m68ki_cpu.ir & 0xfff8) == 0xf518)
 	{
@@ -1673,7 +1725,16 @@ int m68851_buserror(uint32 *addr)
 
 	if (m68ki_cpu.mmu_tablewalk)
 	{
-		m68ki_cpu.mmu_tmp_sr |= M68K_MMU_SR_BUS_ERROR | M68K_MMU_SR_INVALID;
+		if (CPU_TYPE_IS_040_PLUS(CPU_TYPE))
+		{
+			/* 040 MMUSR: only BUS_ERROR is valid (no INVALID bit in 040 layout) */
+			m68ki_cpu.mmu_tmp_sr |= M68K_MMU040_SR_BUS_ERROR;
+		}
+		else
+		{
+			/* 030 MMUSR: BUS_ERROR + INVALID */
+			m68ki_cpu.mmu_tmp_sr |= M68K_MMU_SR_BUS_ERROR | M68K_MMU_SR_INVALID;
+		}
 		return 1;
 	}
 

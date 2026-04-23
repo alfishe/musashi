@@ -7138,6 +7138,13 @@ M68KMAKE_OP(movec, 32, rc, .)
 					REG_MMU_TC = REG_DA[(word2 >> 12) & 15];
 					/* 68040 TC: bit 15 = E (enable MMU) */
 					m68ki_cpu.pmmu_enabled = (REG_MMU_TC >> 15) & 1;
+					/* Per 68040 UM §3.3.3: writing TC invalidates both ATCs */
+					{
+						int i;
+						for (i = 0; i < MMU_ATC_ENTRIES; i++)
+							m68ki_cpu.mmu_atc_tag[i] = 0;
+						m68ki_cpu.mmu_atc_history = 0;
+					}
 					return;
 				}
 				m68ki_exception_illegal();
@@ -7183,7 +7190,7 @@ M68KMAKE_OP(movec, 32, rc, .)
 				}
 				if (CPU_TYPE_IS_040_PLUS(CPU_TYPE))
 				{
-					/* TODO */
+					m68ki_cpu.mmu_sr = REG_DA[(word2 >> 12) & 15];
 					return;
 				}
 				m68ki_exception_illegal();
@@ -8690,6 +8697,13 @@ M68KMAKE_OP(pmmu, 32, ., .)
 	 * The 060 has its own MMU but uses MOVEC for register access
 	 * and PLPA for address translation. */
 	if(CPU_TYPE_IS_060_PLUS(CPU_TYPE)) {
+		m68ki_exception_1111();
+		return;
+	}
+	/* 68040: Old-style PMMU coprocessor instructions are also illegal.
+	 * The 040 uses MOVEC for register access (TC, URP, SRP, ITT/DTT, MMUSR)
+	 * and dedicated F5xx opcodes for PTEST/PFLUSH. */
+	if(CPU_TYPE_IS_040_PLUS(CPU_TYPE)) {
 		m68ki_exception_1111();
 		return;
 	}

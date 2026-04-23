@@ -4,6 +4,15 @@
 
 op_MOVEC_TC:
 
+    * Set up DTT0 to transparently map 0x00xxxxxx (covers code, stack, devices)
+    * This must be done BEFORE enabling the MMU, otherwise instruction
+    * fetches through unmapped pages cause recursive bus errors
+    mov.l   #0x0000C000, %d0    | Base=0x00, Mask=0x00, E=1, S=U+S
+    .word   0x4E7B              | MOVEC D0,DTT0
+    .word   0x0006
+    .word   0x4E7B              | MOVEC D0,ITT0
+    .word   0x0004
+
     * Ensure MMU is disabled initially
     moveq   #0, %d0
     .word   0x4E7B              | MOVEC D0,TC
@@ -40,5 +49,12 @@ op_MOVEC_TC:
     moveq   #0, %d0
     .word   0x4E7B              | MOVEC D0,TC
     .word   0x0003
+
+    * Clear TT registers
+    moveq   #0, %d0
+    .word   0x4E7B              | MOVEC D0,DTT0
+    .word   0x0006
+    .word   0x4E7B              | MOVEC D0,ITT0
+    .word   0x0004
 
     rts

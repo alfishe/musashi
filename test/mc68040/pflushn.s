@@ -69,7 +69,7 @@ clear_loop:
     * Read MMUSR - verify G bit is set
     .word   0x4E7A              | MOVEC MMUSR,D0
     .word   0x0805
-    andi.l  #0x80, %d0
+    andi.l  #0x200, %d0
     beq     TEST_FAIL           | G bit should be set for global page
 
     * PTEST on non-global address 0x10001000
@@ -79,7 +79,7 @@ clear_loop:
     * Read MMUSR - verify G bit is NOT set
     .word   0x4E7A              | MOVEC MMUSR,D0
     .word   0x0805
-    andi.l  #0x80, %d0
+    andi.l  #0x200, %d0
     bne     TEST_FAIL           | G bit should NOT be set for non-global page
 
     * Now execute PFLUSHN on the non-global address

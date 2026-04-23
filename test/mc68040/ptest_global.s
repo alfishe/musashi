@@ -68,8 +68,8 @@ clear_loop:
     .word   0x4E7A              | MOVEC MMUSR,D0
     .word   0x0805
 
-    * Check G bit (global) - bit 7 in MMUSR (0x80)
-    andi.l  #0x80, %d0
+    * Check G bit (global) - bit 9 in MMUSR (0x200)
+    andi.l  #0x200, %d0
     beq     TEST_FAIL           | G bit should be set
 
     * Disable MMU
