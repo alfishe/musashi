@@ -406,6 +406,62 @@ unsigned int m68k_disassemble_raw(char* str_buff, unsigned int pc, const unsigne
 
 
 /* ======================================================================== */
+/* ===================== MMU CO-SIMULATION INTERFACE ====================== */
+/* ======================================================================== */
+
+/* These functions are only available when M68K_MMU_COSIM is enabled in
+ * m68kconf.h. They provide hooks for RTL co-simulation with FPGA cores.
+ * When M68K_MMU_COSIM is OFF (the default), these symbols do not exist
+ * and the CPU struct contains no callback pointers — zero overhead.
+ */
+
+#if M68K_EMULATE_PMMU && M68K_MMU_COSIM
+
+/* ATC operation codes for the ATC callback */
+#define M68K_MMU_ATC_INSERT    0
+#define M68K_MMU_ATC_FLUSH     1
+#define M68K_MMU_ATC_FLUSH_ALL 2
+
+/* Fault type codes for the fault callback */
+#define M68K_MMU_FAULT_INVALID      0
+#define M68K_MMU_FAULT_WRITE_PROT   1
+#define M68K_MMU_FAULT_SUPERVISOR   2
+#define M68K_MMU_FAULT_BUS_ERROR    3
+
+/* ATC entry for state dump */
+typedef struct {
+	unsigned int  tag;       /* ATC tag (valid|FC|logical page) */
+	unsigned int  data;      /* ATC data (physical page + flags) */
+} m68k_atc_entry;
+
+/* Set the callback fired on every MMU address translation.
+ * Parameters: logical_addr, physical_addr, fc, access_type (0=read,1=write),
+ *             cache_mode, from_atc (1=ATC hit, 0=table walk), mmusr
+ */
+void m68k_set_mmu_translate_callback(void (*callback)(unsigned int, unsigned int,
+	unsigned char, unsigned char, unsigned char, unsigned char, unsigned short));
+
+/* Set the callback fired on ATC modifications.
+ * Parameters: operation (M68K_MMU_ATC_*), logical_addr, physical_addr
+ */
+void m68k_set_mmu_atc_callback(void (*callback)(int, unsigned int, unsigned int));
+
+/* Set the callback fired on MMU access faults.
+ * Parameters: fault_addr, fc, access_type, fault_type (M68K_MMU_FAULT_*)
+ */
+void m68k_set_mmu_fault_callback(void (*callback)(unsigned int, unsigned char,
+	unsigned char, unsigned char));
+
+/* Dump current ATC entries for state comparison.
+ * Copies up to max_entries into the provided array.
+ * Returns the number of valid entries written.
+ */
+int m68k_get_atc_entries(m68k_atc_entry *entries, int max_entries);
+
+#endif /* M68K_EMULATE_PMMU && M68K_MMU_COSIM */
+
+
+/* ======================================================================== */
 /* ============================== MAME STUFF ============================== */
 /* ======================================================================== */
 

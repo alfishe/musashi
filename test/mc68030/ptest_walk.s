@@ -44,7 +44,8 @@ op_PTEST:
 
     * Enable MMU
     * TC: E=1, PS=8, IS=0, TIA=8, TIB=8, TIC=8, TID=0
-    mov.l   #0x80808880, TC_DATA
+    * Sum = 8 + 0 + 8 + 8 + 8 + 0 = 32 (valid)
+    mov.l   #0x88088800, TC_DATA
     lea     TC_DATA, %a0
     .word   0xF010
     .word   0x4000

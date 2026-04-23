@@ -259,6 +259,17 @@
 #define M68K_EMULATE_PMMU           M68K_OPT_ON
 #endif
 
+/* If ON, MMU co-simulation callbacks are compiled in.
+ * This adds callback hooks at MMU translation, ATC modification, and
+ * access fault points for RTL co-simulation with FPGA cores.
+ * When OFF (default), no callback pointers are added to the CPU struct
+ * and no branches are added to the hot path — zero overhead.
+ * Requires M68K_EMULATE_PMMU to be ON.
+ */
+#ifndef M68K_MMU_COSIM
+#define M68K_MMU_COSIM              M68K_OPT_OFF
+#endif
+
 /* ----------------------------- COMPATIBILITY ---------------------------- */
 
 /* The following options set optimizations that violate the current ANSI
