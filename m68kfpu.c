@@ -1264,6 +1264,97 @@ static void fpgen_rm_reg(uint16 w2)
 		}
 	}
 
+	/* 68040: The 040 FPU only implements a subset of operations in hardware.
+	 * Everything else traps to F-line (vector 11) for FPSP emulation.
+	 * 040 hardware ops (from MC68040 UM Section 6):
+	 *   FMOVE(0x00), FINT(0x01), FINTRZ(0x03), FSQRT(0x04),
+	 *   FABS(0x18), FNEG(0x1A), FDIV(0x20), FADD(0x22),
+	 *   FMUL(0x23), FSUB(0x28), FCMP(0x38), FTST(0x3A),
+	 *   plus single/double rounding variants (0x40-0x6C).
+	 * NOT hardware: FSIN, FCOS, FSINCOS, FMOD, FREM, FGETEXP, FGETMAN,
+	 *   FSGLDIV, FSGLMUL, transcendentals, FMOVECR, packed decimal.
+	 */
+	if (CPU_TYPE_IS_040(CPU_TYPE))
+	{
+		/* FMOVECR: 040 has no constant ROM */
+		if (rm && src == 7) {
+			m68ki_exception_1111();
+			return;
+		}
+
+		{
+			int is_hw = 0;
+
+			switch(opmode) {
+				/* Base operations (extended precision) */
+				case 0x00: /* FMOVE */
+				case 0x01: /* FINT */
+				case 0x03: /* FINTRZ */
+				case 0x04: /* FSQRT */
+				case 0x18: /* FABS */
+				case 0x1A: /* FNEG */
+				case 0x20: /* FDIV */
+				case 0x22: /* FADD */
+				case 0x23: /* FMUL */
+				case 0x28: /* FSUB */
+				case 0x38: /* FCMP */
+				case 0x3A: /* FTST */
+				/* Single-precision rounding variants */
+				case 0x40: /* FSMOVE */
+				case 0x41: /* FSSQRT */
+				case 0x44: /* FDMOVE */
+				case 0x45: /* FDSQRT */
+				case 0x58: /* FSABS */
+				case 0x5A: /* FSNEG */
+				case 0x5C: /* FDABS */
+				case 0x5E: /* FDNEG */
+				case 0x60: /* FSDIV */
+				case 0x62: /* FSADD */
+				case 0x63: /* FSMUL */
+				case 0x64: /* FDDIV */
+				case 0x66: /* FDADD */
+				case 0x67: /* FDMUL */
+				case 0x68: /* FSSUB */
+				case 0x6C: /* FDSUB */
+					is_hw = 1;
+					break;
+			}
+
+			if (!is_hw) {
+				m68ki_exception_1111();
+				return;
+			}
+		}
+
+		/* Packed decimal source (src==3, rm==1): always trap on 040 */
+		if (rm && src == 3) {
+			m68ki_exception_1111();
+			return;
+		}
+	}
+
+	/* Set SoftFloat rounding mode from FPCR bits 5-4 */
+	{
+		static const int8 fpcr_to_sf_rounding[] = {
+			float_round_nearest_even,  /* FPCR 00 = RN */
+			float_round_to_zero,       /* FPCR 01 = RZ */
+			float_round_down,          /* FPCR 10 = RM (-inf) */
+			float_round_up             /* FPCR 11 = RP (+inf) */
+		};
+		float_rounding_mode = fpcr_to_sf_rounding[(REG_FPCR >> 4) & 3];
+	}
+
+	/* Set SoftFloat rounding precision from FPCR bits 7-6.
+	 * Per MC68040 UM / MC68881 UM:
+	 *   00 = Extended precision (80-bit) — default
+	 *   01 = Single precision (32-bit)
+	 *   10 = Double precision (64-bit)
+	 *   11 = Undefined (treat as extended) */
+	{
+		static const int8 fpcr_to_sf_precision[] = { 80, 32, 64, 80 };
+		floatx80_rounding_precision = fpcr_to_sf_precision[(REG_FPCR >> 6) & 3];
+	}
+
 	// fmovecr #$f, fp0	f200 5c0f
 
 	if (rm)
@@ -1442,16 +1533,29 @@ static void fpgen_rm_reg(uint16 w2)
 		source = REG_FP[src];
 	}
 
-	if ((opmode & 0x44) == 0x44)
+	/* Map single/double rounding variants to base opmode.
+	 * Cannot simply strip bits — opcode layout is not uniform.
+	 * Ref: MC68040 UM Table 6-10 */
+	round = 0;
+	switch (opmode)
 	{
-		round = 2;
-		opmode &= ~0x44;
-	} else if (opmode & 0x40)
-	{
-		round = 1;
-		opmode &= ~0x40;
-	} else
-		round = 0;
+	case 0x40: round = 1; opmode = 0x00; break; /* FSMOVE  → FMOVE */
+	case 0x41: round = 1; opmode = 0x04; break; /* FSSQRT  → FSQRT */
+	case 0x44: round = 2; opmode = 0x00; break; /* FDMOVE  → FMOVE */
+	case 0x45: round = 2; opmode = 0x04; break; /* FDSQRT  → FSQRT */
+	case 0x58: round = 1; opmode = 0x18; break; /* FSABS   → FABS  */
+	case 0x5A: round = 1; opmode = 0x1A; break; /* FSNEG   → FNEG  */
+	case 0x5C: round = 2; opmode = 0x18; break; /* FDABS   → FABS  */
+	case 0x5E: round = 2; opmode = 0x1A; break; /* FDNEG   → FNEG  */
+	case 0x60: round = 1; opmode = 0x20; break; /* FSDIV   → FDIV  */
+	case 0x62: round = 1; opmode = 0x22; break; /* FSADD   → FADD  */
+	case 0x63: round = 1; opmode = 0x23; break; /* FSMUL   → FMUL  */
+	case 0x64: round = 2; opmode = 0x20; break; /* FDDIV   → FDIV  */
+	case 0x66: round = 2; opmode = 0x22; break; /* FDADD   → FADD  */
+	case 0x67: round = 2; opmode = 0x23; break; /* FDMUL   → FMUL  */
+	case 0x68: round = 1; opmode = 0x28; break; /* FSSUB   → FSUB  */
+	case 0x6C: round = 2; opmode = 0x28; break; /* FDSUB   → FSUB  */
+	}
 
 	switch (opmode)
 	{
@@ -1553,8 +1657,11 @@ static void fpgen_rm_reg(uint16 w2)
 		}
 		case 0x24:		// FSGLDIV
 		{
-			REG_FP[dst] = double_to_fx80((float)fx80_to_double(floatx80_div(REG_FP[dst], source)));
-		    	SET_CONDITION_CODES(REG_FP[dst]); // JFF
+			floatx80 tmp = floatx80_div(REG_FP[dst], source);
+			/* Round result to single precision via SoftFloat */
+			float32 f32 = floatx80_to_float32(tmp);
+			REG_FP[dst] = float32_to_floatx80(f32);
+		    	SET_CONDITION_CODES(REG_FP[dst]);
 			USE_CYCLES(43);
 			break;
 		}
@@ -1574,7 +1681,10 @@ static void fpgen_rm_reg(uint16 w2)
 		}
 		case 0x27:		// FSGLMUL
 		{
-			REG_FP[dst] = double_to_fx80((float)fx80_to_double(floatx80_mul(REG_FP[dst], source)));
+			floatx80 tmp = floatx80_mul(REG_FP[dst], source);
+			/* Round result to single precision via SoftFloat */
+			float32 f32 = floatx80_to_float32(tmp);
+			REG_FP[dst] = float32_to_floatx80(f32);
 			SET_CONDITION_CODES(REG_FP[dst]);
 			USE_CYCLES(11);
 			break;
@@ -1636,12 +1746,14 @@ static void fpgen_rm_reg(uint16 w2)
 	}
 	if (round == 1)
 	{
-		// round to single
-		REG_FP[dst] = double_to_fx80((float)fx80_to_double(REG_FP[dst]));
+		/* Round to single precision via SoftFloat (preserves FPCR rounding mode) */
+		float32 f32 = floatx80_to_float32(REG_FP[dst]);
+		REG_FP[dst] = float32_to_floatx80(f32);
 	} else if (round == 2)
 	{
-		// round to double
-		REG_FP[dst] = double_to_fx80(fx80_to_double(REG_FP[dst]));
+		/* Round to double precision via SoftFloat (preserves FPCR rounding mode) */
+		float64 f64 = floatx80_to_float64(REG_FP[dst]);
+		REG_FP[dst] = float64_to_floatx80(f64);
 	}
 
 }
@@ -1653,11 +1765,20 @@ static void fmove_reg_mem(uint16 w2)
 	int dst = (w2 >> 10) & 0x7;
 	int k = (w2 & 0x7f);
 
-	/* 68060: Packed decimal (dst 3 = static k, dst 7 = dynamic k) is
-	 * unimplemented — trap to F-line for FPSP emulation */
-	if (CPU_TYPE_IS_060_PLUS(CPU_TYPE) && (dst == 3 || dst == 7)) {
+	/* 68040/68060: Packed decimal (dst 3 = static k, dst 7 = dynamic k) is
+	 * unimplemented in hardware — trap to F-line for FPSP emulation */
+	if (CPU_TYPE_IS_040_PLUS(CPU_TYPE) && (dst == 3 || dst == 7)) {
 		m68ki_exception_1111();
 		return;
+	}
+
+	/* Set SoftFloat rounding mode from FPCR for format conversions */
+	{
+		static const int8 fpcr_to_sf_rounding[] = {
+			float_round_nearest_even, float_round_to_zero,
+			float_round_down, float_round_up
+		};
+		float_rounding_mode = fpcr_to_sf_rounding[(REG_FPCR >> 4) & 3];
 	}
 
 	switch (dst)

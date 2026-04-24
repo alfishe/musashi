@@ -450,8 +450,8 @@ typedef uint32 uint64;
 #endif
 
 #if M68K_EMULATE_040
-#define CPU_TYPE_IS_040_PLUS(A)    ((A) & (CPU_TYPE_040 | CPU_TYPE_EC040 | CPU_TYPE_060 | CPU_TYPE_EC060 | CPU_TYPE_LC060))
-#define CPU_TYPE_IS_040(A)         ((A) & (CPU_TYPE_040 | CPU_TYPE_EC040))
+#define CPU_TYPE_IS_040_PLUS(A)    ((A) & (CPU_TYPE_040 | CPU_TYPE_EC040 | CPU_TYPE_LC040 | CPU_TYPE_060 | CPU_TYPE_EC060 | CPU_TYPE_LC060))
+#define CPU_TYPE_IS_040(A)         ((A) & (CPU_TYPE_040 | CPU_TYPE_EC040 | CPU_TYPE_LC040))
 	#define CPU_TYPE_IS_040_LESS(A)    1
 #else
 	#define CPU_TYPE_IS_040_PLUS(A)    0
@@ -460,7 +460,7 @@ typedef uint32 uint64;
 #endif
 
 #if M68K_EMULATE_030
-#define CPU_TYPE_IS_030_PLUS(A)    ((A) & (CPU_TYPE_030 | CPU_TYPE_EC030 | CPU_TYPE_040 | CPU_TYPE_EC040 | CPU_TYPE_060 | CPU_TYPE_EC060 | CPU_TYPE_LC060))
+#define CPU_TYPE_IS_030_PLUS(A)    ((A) & (CPU_TYPE_030 | CPU_TYPE_EC030 | CPU_TYPE_040 | CPU_TYPE_EC040 | CPU_TYPE_LC040 | CPU_TYPE_060 | CPU_TYPE_EC060 | CPU_TYPE_LC060))
 #define CPU_TYPE_IS_030_LESS(A)    1
 #else
 #define CPU_TYPE_IS_030_PLUS(A)	0
@@ -468,7 +468,7 @@ typedef uint32 uint64;
 #endif
 
 #if M68K_EMULATE_020
-#define CPU_TYPE_IS_020_PLUS(A)    ((A) & (CPU_TYPE_020 | CPU_TYPE_030 | CPU_TYPE_EC030 | CPU_TYPE_040 | CPU_TYPE_EC040 | CPU_TYPE_060 | CPU_TYPE_EC060 | CPU_TYPE_LC060))
+#define CPU_TYPE_IS_020_PLUS(A)    ((A) & (CPU_TYPE_020 | CPU_TYPE_030 | CPU_TYPE_EC030 | CPU_TYPE_040 | CPU_TYPE_EC040 | CPU_TYPE_LC040 | CPU_TYPE_060 | CPU_TYPE_EC060 | CPU_TYPE_LC060))
 	#define CPU_TYPE_IS_020_LESS(A)    1
 #else
 	#define CPU_TYPE_IS_020_PLUS(A)    0
@@ -476,7 +476,7 @@ typedef uint32 uint64;
 #endif
 
 #if M68K_EMULATE_EC020
-#define CPU_TYPE_IS_EC020_PLUS(A)  ((A) & (CPU_TYPE_EC020 | CPU_TYPE_020 | CPU_TYPE_030 | CPU_TYPE_EC030 | CPU_TYPE_040 | CPU_TYPE_EC040 | CPU_TYPE_060 | CPU_TYPE_EC060 | CPU_TYPE_LC060))
+#define CPU_TYPE_IS_EC020_PLUS(A)  ((A) & (CPU_TYPE_EC020 | CPU_TYPE_020 | CPU_TYPE_030 | CPU_TYPE_EC030 | CPU_TYPE_040 | CPU_TYPE_EC040 | CPU_TYPE_LC040 | CPU_TYPE_060 | CPU_TYPE_EC060 | CPU_TYPE_LC060))
 	#define CPU_TYPE_IS_EC020_LESS(A)  ((A) & (CPU_TYPE_000 | CPU_TYPE_010 | CPU_TYPE_EC020))
 #else
 	#define CPU_TYPE_IS_EC020_PLUS(A)  CPU_TYPE_IS_020_PLUS(A)
@@ -485,7 +485,7 @@ typedef uint32 uint64;
 
 #if M68K_EMULATE_010
 	#define CPU_TYPE_IS_010(A)         ((A) == CPU_TYPE_010)
-#define CPU_TYPE_IS_010_PLUS(A)    ((A) & (CPU_TYPE_010 | CPU_TYPE_EC020 | CPU_TYPE_020 | CPU_TYPE_EC030 | CPU_TYPE_030 | CPU_TYPE_040 | CPU_TYPE_EC040 | CPU_TYPE_060 | CPU_TYPE_EC060 | CPU_TYPE_LC060))
+#define CPU_TYPE_IS_010_PLUS(A)    ((A) & (CPU_TYPE_010 | CPU_TYPE_EC020 | CPU_TYPE_020 | CPU_TYPE_EC030 | CPU_TYPE_030 | CPU_TYPE_040 | CPU_TYPE_EC040 | CPU_TYPE_LC040 | CPU_TYPE_060 | CPU_TYPE_EC060 | CPU_TYPE_LC060))
 #define CPU_TYPE_IS_010_LESS(A)    ((A) & (CPU_TYPE_000 | CPU_TYPE_008 | CPU_TYPE_010))
 #else
 	#define CPU_TYPE_IS_010(A)         0
@@ -1064,9 +1064,11 @@ typedef struct
 	uint8  mmu_tmp_buserror_rw;       /* R/W at time of fault */
 	uint8  mmu_tmp_buserror_fc;       /* FC at time of fault */
 	uint8  mmu_tmp_buserror_sz;       /* Access size at time of fault */
+	uint8  mmu_tmp_buserror_lk;       /* Locked (RMW) bus cycle: CAS, TAS */
 	uint8  mmu_tmp_rw;         /* Current access R/W (1=read, 0=write) */
 	uint8  mmu_tmp_fc;         /* Current access function code */
 	uint8  mmu_tmp_sz;         /* Current access size */
+	uint8  mmu_tmp_lk;         /* Current access is locked/RMW (CAS, TAS) */
 	int    mmu_tablewalk;      /* Flag: currently performing table walk */
 	uint   mmu_last_logical_addr; /* Last translated logical address */
 
@@ -2318,6 +2320,10 @@ static inline void m68ki_exception_bus_error(void)
 
 		/* ATC (bit 7) - set if fault was from ATC (translation fault) */
 		ssw |= 0x0080;
+
+		/* LK (bit 6) - Locked transfer (RMW: CAS, TAS, CAS2) */
+		if (m68ki_cpu.mmu_tmp_buserror_lk)
+			ssw |= 0x0040;
 
 		/* RW (bit 5) - Read/Write: 1=read, 0=write */
 		if (m68ki_cpu.mmu_tmp_buserror_rw)

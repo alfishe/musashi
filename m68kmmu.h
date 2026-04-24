@@ -166,6 +166,7 @@ static void pmmu_set_buserror(uint32 addr_in)
 		m68ki_cpu.mmu_tmp_buserror_rw = m68ki_cpu.mmu_tmp_rw;
 		m68ki_cpu.mmu_tmp_buserror_fc = m68ki_cpu.mmu_tmp_fc;
 		m68ki_cpu.mmu_tmp_buserror_sz = m68ki_cpu.mmu_tmp_sz;
+		m68ki_cpu.mmu_tmp_buserror_lk = m68ki_cpu.mmu_tmp_lk;
 
 		/* Co-sim: notify access fault */
 		m68ki_mmu_cosim_fault(addr_in, m68ki_cpu.mmu_tmp_fc,

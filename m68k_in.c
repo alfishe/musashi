@@ -913,6 +913,58 @@ M68KMAKE_OP(1111, 0, ., .)
 {
 	uint16 ir = REG_IR;
 
+	/* 68040+: MOVE16 forms with absolute address (F600-F61F)
+	 * F600+reg: MOVE16 (Ax)+,xxx.L    F608+reg: MOVE16 xxx.L,(Ax)+
+	 * F610+reg: MOVE16 (Ax),(xxx).L   F618+reg: MOVE16 (xxx).L,(Ax)
+	 * All transfers are 16-byte aligned */
+	if (CPU_TYPE_IS_040_PLUS(CPU_TYPE) && (ir & 0xFFE0) == 0xF600)
+	{
+		int ax = ir & 7;
+		int form = (ir >> 3) & 3;
+		uint32 abs_addr = OPER_I_32();
+		uint32 src, dst;
+
+		switch (form)
+		{
+		case 0:  /* (Ax)+,xxx.L */
+			src = REG_A[ax] & ~0xF;
+			dst = abs_addr & ~0xF;
+			m68ki_write_32(dst,    m68ki_read_32(src));
+			m68ki_write_32(dst+4,  m68ki_read_32(src+4));
+			m68ki_write_32(dst+8,  m68ki_read_32(src+8));
+			m68ki_write_32(dst+12, m68ki_read_32(src+12));
+			REG_A[ax] += 16;
+			break;
+		case 1:  /* xxx.L,(Ax)+ */
+			src = abs_addr & ~0xF;
+			dst = REG_A[ax] & ~0xF;
+			m68ki_write_32(dst,    m68ki_read_32(src));
+			m68ki_write_32(dst+4,  m68ki_read_32(src+4));
+			m68ki_write_32(dst+8,  m68ki_read_32(src+8));
+			m68ki_write_32(dst+12, m68ki_read_32(src+12));
+			REG_A[ax] += 16;
+			break;
+		case 2:  /* (Ax),(xxx).L — no post-increment */
+			src = REG_A[ax] & ~0xF;
+			dst = abs_addr & ~0xF;
+			m68ki_write_32(dst,    m68ki_read_32(src));
+			m68ki_write_32(dst+4,  m68ki_read_32(src+4));
+			m68ki_write_32(dst+8,  m68ki_read_32(src+8));
+			m68ki_write_32(dst+12, m68ki_read_32(src+12));
+			break;
+		case 3:  /* (xxx).L,(Ax) — no post-increment */
+			src = abs_addr & ~0xF;
+			dst = REG_A[ax] & ~0xF;
+			m68ki_write_32(dst,    m68ki_read_32(src));
+			m68ki_write_32(dst+4,  m68ki_read_32(src+4));
+			m68ki_write_32(dst+8,  m68ki_read_32(src+8));
+			m68ki_write_32(dst+12, m68ki_read_32(src+12));
+			break;
+		}
+		USE_CYCLES(4);
+		return;
+	}
+
 	/* 68040+: CINV/CPUSH cache instructions - no-op in emulator
 	 * CINV:  F4xx where (ir & 0xFF20) == 0xF400
 	 * CPUSH: F4xx where (ir & 0xFF20) == 0xF420 */
@@ -3314,9 +3366,14 @@ M68KMAKE_OP(cas, 8, ., .)
 	{
 		uint word2 = OPER_I_16();
 		uint ea = M68KMAKE_GET_EA_AY_8;
-		uint dest = m68ki_read_8(ea);
-		uint* compare = &REG_D[word2 & 7];
-		uint res = dest - MASK_OUT_ABOVE_8(*compare);
+		uint dest;
+		uint* compare;
+		uint res;
+
+		m68ki_cpu.mmu_tmp_lk = 1;  /* locked RMW cycle */
+		dest = m68ki_read_8(ea);
+		compare = &REG_D[word2 & 7];
+		res = dest - MASK_OUT_ABOVE_8(*compare);
 
 		m68ki_trace_t0();			   /* auto-disable (see m68kcpu.h) */
 		FLAG_N = NFLAG_8(res);
@@ -3331,6 +3388,7 @@ M68KMAKE_OP(cas, 8, ., .)
 			USE_CYCLES(3);
 			m68ki_write_8(ea, MASK_OUT_ABOVE_8(REG_D[(word2 >> 6) & 7]));
 		}
+		m68ki_cpu.mmu_tmp_lk = 0;
 		return;
 	}
 	m68ki_exception_illegal();
@@ -3343,9 +3401,14 @@ M68KMAKE_OP(cas, 16, ., .)
 	{
 		uint word2 = OPER_I_16();
 		uint ea = M68KMAKE_GET_EA_AY_16;
-		uint dest = m68ki_read_16(ea);
-		uint* compare = &REG_D[word2 & 7];
-		uint res = dest - MASK_OUT_ABOVE_16(*compare);
+		uint dest;
+		uint* compare;
+		uint res;
+
+		m68ki_cpu.mmu_tmp_lk = 1;  /* locked RMW cycle */
+		dest = m68ki_read_16(ea);
+		compare = &REG_D[word2 & 7];
+		res = dest - MASK_OUT_ABOVE_16(*compare);
 
 		m68ki_trace_t0();			   /* auto-disable (see m68kcpu.h) */
 		FLAG_N = NFLAG_16(res);
@@ -3360,6 +3423,7 @@ M68KMAKE_OP(cas, 16, ., .)
 			USE_CYCLES(3);
 			m68ki_write_16(ea, MASK_OUT_ABOVE_16(REG_D[(word2 >> 6) & 7]));
 		}
+		m68ki_cpu.mmu_tmp_lk = 0;
 		return;
 	}
 	m68ki_exception_illegal();
@@ -3372,9 +3436,14 @@ M68KMAKE_OP(cas, 32, ., .)
 	{
 		uint word2 = OPER_I_16();
 		uint ea = M68KMAKE_GET_EA_AY_32;
-		uint dest = m68ki_read_32(ea);
-		uint* compare = &REG_D[word2 & 7];
-		uint res = dest - *compare;
+		uint dest;
+		uint* compare;
+		uint res;
+
+		m68ki_cpu.mmu_tmp_lk = 1;  /* locked RMW cycle */
+		dest = m68ki_read_32(ea);
+		compare = &REG_D[word2 & 7];
+		res = dest - *compare;
 
 		m68ki_trace_t0();			   /* auto-disable (see m68kcpu.h) */
 		FLAG_N = NFLAG_32(res);
@@ -3389,6 +3458,7 @@ M68KMAKE_OP(cas, 32, ., .)
 			USE_CYCLES(3);
 			m68ki_write_32(ea, REG_D[(word2 >> 6) & 7]);
 		}
+		m68ki_cpu.mmu_tmp_lk = 0;
 		return;
 	}
 	m68ki_exception_illegal();
@@ -7628,14 +7698,19 @@ M68KMAKE_OP(moveq, 32, ., .)
 
 M68KMAKE_OP(move16, 32, ., .)
 {
+	/* MOVE16 (Ax)+,(Ay)+ — 68040 line transfer (16-byte aligned)
+	 * Opcode: 1111 0110 0010 0xxx, extension word: 1yyy000000000000
+	 * Transfers 16 bytes aligned to a 16-byte boundary */
 	uint16 w2 = OPER_I_16();
 	int ax = REG_IR & 7;
 	int ay = (w2 >> 12) & 7;
+	uint32 src = REG_A[ax] & ~0xF;  /* align to 16-byte boundary */
+	uint32 dst = REG_A[ay] & ~0xF;
 
-	m68ki_write_32(REG_A[ay],    m68ki_read_32(REG_A[ax]));
-	m68ki_write_32(REG_A[ay]+4,  m68ki_read_32(REG_A[ax]+4));
-	m68ki_write_32(REG_A[ay]+8,  m68ki_read_32(REG_A[ax]+8));
-	m68ki_write_32(REG_A[ay]+12, m68ki_read_32(REG_A[ax]+12));
+	m68ki_write_32(dst,    m68ki_read_32(src));
+	m68ki_write_32(dst+4,  m68ki_read_32(src+4));
+	m68ki_write_32(dst+8,  m68ki_read_32(src+8));
+	m68ki_write_32(dst+12, m68ki_read_32(src+12));
 
 	REG_A[ax] += 16;
 	REG_A[ay] += 16;
@@ -10488,7 +10563,9 @@ M68KMAKE_OP(tas, 8, ., .)
        will be needed. */
 	allow_writeback = m68ki_tas_callback();
 
+	m68ki_cpu.mmu_tmp_lk = 1;  /* locked RMW cycle */
 	if (allow_writeback==1) m68ki_write_8(ea, dst | 0x80);
+	m68ki_cpu.mmu_tmp_lk = 0;
 }
 
 
