@@ -20,6 +20,38 @@ The harness integrates two primary datasets:
 
 Combined, these provide **1,317,560 test vectors** covering almost every opcode/addressing mode combination.
 
+## Project Structure
+
+musashi/
+├── test/
+│   ├── singlestep/
+│   │   ├── README.md                # Entry point and usage
+│   │   ├── sst_runner.sh            # Zero-Setup bootstrap script
+│   │   ├── data/                    # Raw test repositories (gitignored)
+│   │   │   ├── 680x0/               # SingleStepTests/680x0 (TomHarte)
+│   │   │   └── m68000/              # SingleStepTests/m68000 (raddad772)
+│   │   ├── unified/                 # Normalized .sst files (gitignored)
+│   │   │   ├── tomharte/            # Source A output
+│   │   │   └── raddad/              # Source B output
+│   │   ├── build/                   # CMake build tree (gitignored)
+│   │   ├── reports/                 # Auto-generated failure reports
+│   │   ├── sst_loader.c/h           # .sst format loader
+│   │   ├── sst_runner.c             # Standalone runner C core
+│   │   └── CMakeLists.txt           # Build system
+├── tools/
+│   └── sst_convert.py               # Dual-source converter
+└── doc/testing/
+    ├── testing_strategy.md
+    ├── test_plan_overview.md
+    ├── test_plan_integer.md
+    ├── test_plan_fpu.md
+    ├── test_plan_mmu_030.md
+    ├── test_plan_mmu_040.md
+    ├── test_plan_system.md
+    ├── test_plan_singlestep.md
+    └── singlestep_harness_design.md
+```
+
 ## Integration Architecture
 
 The harness is designed for performance and zero-dependency runtime execution:
