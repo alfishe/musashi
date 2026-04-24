@@ -1,12 +1,98 @@
 
+* ============================================================================
+* entry.s — Test Case Entry Point and Runtime Scaffold
+* ============================================================================
 *
-* Test case entry point. include this file in each test
+* PURPOSE
+* -------
+* This file is the mandatory include for every test case in the Musashi test
+* suite. It provides:
+*   1. The memory map contract between the test binary and test_driver.cpp
+*   2. The 68000 exception vector table layout (documented, not emitted)
+*   3. The "magic register" I/O interface via memory-mapped addresses
+*   4. The test entry point (_start / main) with exception handler bootstrap
+*   5. The run_test trampoline that each test's assembly fills in
 *
-
-* Compile/link commands:
-* m68k-elf-as -march=68040  -o file.o test.s
-* m68k-elf-ld -Ttext 0x10000 --oformat binary -o test.bin file.o
-* m68k-elf-objdump -D test.bin -b binary -mm68k:68040
+* HOW IT WORKS
+* ------------
+* The test_driver.cpp (host side) loads the binary flat into emulated RAM at
+* 0x10000, sets up the vector table in the first 64KB of RAM (0x0–0xFFFF),
+* and starts execution at _start. The test binary itself does NOT emit vector
+* table data — the host injects them directly. This is why the vector table
+* below is in comments: it documents the layout the host must respect, but
+* the assembler does not generate it.
+*
+* Why not emit the vector table from assembly?
+*   - The binary is position-independent ROM loaded at 0x10000. Absolute
+*     vector addresses would need relocation, which the flat binary format
+*     doesn't support. The host (test_driver.cpp) knows the load address and
+*     writes the correct absolute addresses into low RAM before starting.
+*   - Two vectors (CHK #6 and TRAPV #7) are dynamically patched at runtime
+*     in main() using mov.l because their handlers live in ROM alongside the
+*     test code. All others are set to 0xDEADBEEF by the host — a sentinel
+*     that causes an obvious crash on any unexpected exception, making test
+*     failures immediately visible rather than silently corrupting state.
+*
+* MEMORY MAP
+* ----------
+*   0x00000000 – 0x0000FFFF  RAM   Vector table (0x000–0x3FF) + stack area
+*                                   Set up entirely by test_driver.cpp before
+*                                   execution begins.
+*   0x00010000 – ...          ROM   Test binary (.text section loaded here)
+*   0x00100000 – 0x00100400  MMIO  Magic test-control registers (see below)
+*   0x00200000 – 0x00210000  ROM   FPSP (Floating Point Support Package ROM,
+*                                   only if FP support compiled in)
+*   0x00300000 – 0x00310000  RAM   Secondary data RAM for tests that need a
+*                                   separate writable region
+*   0x00400000 – 0x00410000  RAM   FPSP scratch RAM
+*   0x80000000 – 0xA0000000  ROM   Floating point test case data
+*
+* MAGIC REGISTERS (memory-mapped I/O)
+* ------------------------------------
+* The emulator intercepts accesses to 0x100000–0x1000FF to communicate with
+* the host test runner. These are not real hardware registers — test_driver.cpp
+* uses a custom memory read/write hook to detect writes to these addresses.
+*
+*   0x100000  TEST_FAIL_REG   Any write → mark test as FAILED, halt
+*   0x100004  TEST_PASS_REG   Any write → mark test as PASSED, halt
+*   0x100008  PRINT_REG_REG   Any write → dump CPU register state to stdout
+*   0x10000C  INTERRUPT_REG   Any write → trigger an interrupt
+*   0x100014  STDOUT_REG      Byte write → emit that byte to stdout (putchar)
+*   0x100020  PRINT_FP_REG    Any write → dump FPU state to stdout
+*
+* STACK LAYOUT
+* ------------
+*   STACK_BASE  = 0x3F0   Supervisor stack (SSP) grows down from here.
+*                          Placed well below the vector table end (0x400) to
+*                          avoid collisions. Stack space = 0x3F0 bytes.
+*   STACK2_BASE = 0x310000 Secondary stack for tests needing two stack areas.
+*
+* INITIALIZATION SEQUENCE (main)
+* ------------------------------
+*   1. Patch CHK handler (vector 6) into vector table at 0x18
+*      — uses mov.l because the address is known only at link time
+*   2. Patch TRAPV handler (vector 7) into vector table at 0x1C
+*   3. JSR to run_test (defined per test case, linked in after this file)
+*   4. On return: write to TEST_PASS_REG → signals success to host
+*   5. STOP #0x2700 → halt with interrupts fully masked (supervisor mode)
+*
+* EXCEPTION HANDLERS
+* ------------------
+*   EXCEPTION_6 (CHK):   Sets D6 = 0xEEEE0006 as a recognizable sentinel,
+*                         then RTE. Tests that intentionally trigger CHK check
+*                         for this value to confirm the exception fired.
+*   EXCEPTION_7 (TRAPV): Sets D0 = 0x12345678 as sentinel, then RTE.
+*   TEST_FAIL:           Writes to TEST_FAIL_REG then halts. Called by test
+*                         code that detects an incorrect result.
+*   All others (0xDEADBEEF): Immediate crash on any unexpected exception.
+*
+* TOOLCHAIN
+* ---------
+*   Assemble:   m68k-elf-as -march=68040 -o file.o test.s
+*   Link:       m68k-elf-ld -Ttext 0x10000 --oformat binary -o test.bin file.o
+*   Disassemble: m68k-elf-objdump -D test.bin -b binary -mm68k:68040
+*
+* ============================================================================
 
 
 * Memory layout:
