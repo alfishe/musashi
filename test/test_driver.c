@@ -7,12 +7,10 @@
 #include <stdlib.h>
 
 unsigned int m68k_read_disassembler_16 (unsigned int address) {
-    (void)address;
-    exit(EXIT_FAILURE);
+    return m68k_read_memory_16(address);
 }
 unsigned int m68k_read_disassembler_32 (unsigned int address) {
-    (void)address;
-    exit(EXIT_FAILURE);
+    return m68k_read_memory_32(address);
 }
 
 typedef struct memory_device_tag_t {
@@ -126,6 +124,22 @@ void m68k_write_memory_32(unsigned int address, unsigned int value) {
 }
 
 
+static uint32_t g_test_fail_addr = 0;
+static uint32_t g_test_fail_caller = 0;
+static uint32_t g_test_fail_pre_caller = 0;
+
+void instruction_hook(unsigned int pc) {
+    static uint32_t p1 = 0, p2 = 0;
+    if (pc == g_test_fail_addr) {
+        g_test_fail_caller = p1;
+        g_test_fail_pre_caller = p2;
+    }
+    p2 = p1;
+    p1 = pc;
+}
+
+void find_test_fail_address(void);
+
 ///
 /// Test device
 typedef struct test_device_tag_t {
@@ -166,8 +180,30 @@ void test_write16(memory_device_t* dev, uint32_t address, uint16_t value) {
 
 void test_write32(memory_device_t* dev, uint32_t address, uint32_t value) {
     test_device_t* td = (test_device_t*)dev;
-    if (address == 0x0)
+    if (address == 0x0) {
         ++td->test_fail_count;
+        printf("TEST FAIL triggered. Register dump:\n");
+        if (g_test_fail_addr) {
+            printf("  FAIL ROUTINE = 0x%08X\n", g_test_fail_addr);
+        }
+        for (int r = M68K_REG_D0; r <= M68K_REG_A7; ++r) {
+            printf("  %s = 0x%08X\n",
+                r <= M68K_REG_D7 ? (char*[]){"D0","D1","D2","D3","D4","D5","D6","D7"}[r] :
+                                   (char*[]){"A0","A1","A2","A3","A4","A5","A6","A7"}[r - M68K_REG_A0],
+                m68k_get_reg(NULL, r));
+        }
+        printf("  PC = 0x%08X  SR = 0x%04X\n", m68k_get_reg(NULL, M68K_REG_PC), m68k_get_reg(NULL, M68K_REG_SR));
+        if (g_test_fail_caller) {
+            char dasm[128];
+            uint32_t cpu = m68k_get_reg(NULL, M68K_REG_CPU_TYPE);
+            if (g_test_fail_pre_caller) {
+                m68k_disassemble(dasm, g_test_fail_pre_caller, cpu);
+                printf("  PRE-FAIL    = 0x%08X: %s\n", g_test_fail_pre_caller, dasm);
+            }
+            m68k_disassemble(dasm, g_test_fail_caller, cpu);
+            printf("  FAIL SOURCE = 0x%08X: %s\n", g_test_fail_caller, dasm);
+        }
+    }
     if (address == 0x4)
         ++td->test_pass_count;
     if (address == 0xc) {
@@ -312,6 +348,21 @@ rom_slot_t g_roms[N_ROMS];
 
 test_device_t g_test_device;
 
+void find_test_fail_address(void) {
+    /* Signature for TEST_FAIL in entry.s: mov.l #0, TEST_FAIL_REG */
+    /* TEST_FAIL_REG is 0x100000 */
+    /* Opcode: 23fc 0000 0000 0010 0000 */
+    uint8_t sig[] = { 0x23, 0xfc, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00 };
+    for (int i = 0; i < N_ROMS; ++i) {
+        for (int j = 0; j < ROM_SLOT_SIZE - 10; ++j) {
+            if (memcmp(&g_roms[i].memory[j], sig, 10) == 0) {
+                g_test_fail_addr = RAM_SLOT_SIZE + i * ROM_SLOT_SIZE + j;
+                return;
+            }
+        }
+    }
+}
+
 void setup_memory(void) {
     memory_map_init();
 
@@ -404,6 +455,8 @@ int main(int argc, char* argv[]) {
 
     m68k_init();
     m68k_set_cpu_type(cpu_type);
+    m68k_set_instr_hook_callback(instruction_hook);
+    find_test_fail_address();
     m68k_pulse_reset();
 
     for (int i = 0; i < 100; ++i) {

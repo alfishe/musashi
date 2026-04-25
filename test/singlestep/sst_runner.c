@@ -117,29 +117,24 @@ static int run_vector(const sst_vector_t *vec, file_result_t *res, int verbose) 
     m68ki_cpu.stopped = 0;
     m68ki_cpu.run_mode = RUN_MODE_NORMAL;
 
-    /* Set initial registers. Order matters due to stack pointer aliasing:
-     * 1. SR first (establishes supervisor/user mode, affects A7 aliasing)
-     * 2. Data and address registers
-     * 3. USP and SSP (must be set after SR to properly alias)
-     * 4. PC last (triggers prefetch reload via m68ki_jump) */
+    /* Set initial registers. Order matches sst_loader.h:
+     * 0-7:   D0-D7
+     * 8-14:  A0-A6
+     * 15:    USP
+     * 16:    SSP (ISP)
+     * 17:    SR (sets S-bit, must be done before setting USP/SSP)
+     * 18:    PC
+     */
     m68k_set_reg(M68K_REG_SR, vec->initial.regs[17]);
-
-    /* D0-D7 (indices 0-7) */
-    for (int i = 0; i < 8; i++)
+    for (int i = 0; i < 15; i++)
         m68k_set_reg(g_reg_ids[i], vec->initial.regs[i]);
-    /* A0-A6 (indices 8-14) */
-    for (int i = 8; i < 15; i++)
-        m68k_set_reg(g_reg_ids[i], vec->initial.regs[i]);
-    /* USP (15), SSP (16) */
+    
     m68k_set_reg(M68K_REG_USP, vec->initial.regs[15]);
     m68k_set_reg(M68K_REG_ISP, vec->initial.regs[16]);
-    /* PC (18) — this calls m68ki_jump() internally to set up prefetch */
     m68k_set_reg(M68K_REG_PC, vec->initial.regs[18]);
 
-    /* Execute one instruction. Budget of 1 cycle — Musashi always finishes
-     * the current instruction even when the budget is exceeded. */
-    int cycles_used = m68k_execute(1);
-    (void)cycles_used;  /* available for future cycle-accuracy reporting */
+    /* Execute one instruction */
+    m68k_execute(1);
 
     /* Compare final registers */
     int ok = 1;
