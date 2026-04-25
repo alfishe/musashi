@@ -626,8 +626,49 @@ int main(int argc, char **argv) {
             scan_dir(path, max_vectors, verbose, stop_on_fail);
         }
     } else {
-        for (int i = 0; i < num_files; i++)
-            run_file(files[i], max_vectors, verbose, stop_on_fail);
+        /* Resolve each positional arg: accept full path, NAME.sst, or bare NAME.
+         * Search data_dir/{tomharte,raddad}/ subdirectories for matches. */
+        const char *subdirs[] = { "tomharte", "raddad", NULL };
+        for (int i = 0; i < num_files; i++) {
+            const char *arg = files[i];
+
+            /* If arg contains a path separator, treat as literal path */
+            if (strchr(arg, '/') || strchr(arg, '\\')) {
+                run_file(arg, max_vectors, verbose, stop_on_fail);
+                continue;
+            }
+
+            /* Extract base mnemonic: strip .sst extension if present */
+            char mnemonic[256];
+            strncpy(mnemonic, arg, sizeof(mnemonic) - 1);
+            mnemonic[sizeof(mnemonic) - 1] = '\0';
+            size_t mlen = strlen(mnemonic);
+            if (mlen > 4 && strcmp(mnemonic + mlen - 4, ".sst") == 0)
+                mnemonic[mlen - 4] = '\0';
+
+            /* Probe data_dir subdirectories for MNEMONIC.sst */
+            int found = 0;
+            for (int s = 0; subdirs[s]; s++) {
+                char probe[1024];
+
+                /* Apply source filter if --source= was given */
+                if (source_filter && strcmp(source_filter, "both") != 0
+                    && strcmp(source_filter, subdirs[s]) != 0)
+                    continue;
+
+                snprintf(probe, sizeof(probe), "%s/%s/%s.sst",
+                         data_dir, subdirs[s], mnemonic);
+                FILE *fp = fopen(probe, "rb");
+                if (fp) {
+                    fclose(fp);
+                    run_file(probe, max_vectors, verbose, stop_on_fail);
+                    found++;
+                }
+            }
+            if (!found)
+                fprintf(stderr, "ERROR: cannot resolve '%s' "
+                        "(tried data_dir subdirs)\n", arg);
+        }
     }
 
     g_run_end = now_sec();
