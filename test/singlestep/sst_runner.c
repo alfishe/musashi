@@ -15,6 +15,7 @@
 #include <dirent.h>
 #include <time.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 /* Wall-clock helper — returns seconds since epoch as double */
 static double now_sec(void) {
@@ -599,6 +600,14 @@ int main(int argc, char **argv) {
     /* Init Musashi once */
     m68k_init();
     m68k_set_cpu_type(M68K_CPU_TYPE_68000);
+
+    /* Check if default data_dir exists; if not, try local 'unified' (for running from test/singlestep) */
+    if (access(data_dir, F_OK) != 0 && strcmp(data_dir, "test/singlestep/unified") == 0) {
+        if (access("unified", F_OK) == 0) {
+            data_dir = "unified";
+        }
+    }
+
     /* Prime internal pipeline: place NOP at 0, execute it once.
      * First execute after pulse_reset has stale prefetch state. */
     memset(g_mem, 0, MEM_SIZE);
@@ -687,8 +696,20 @@ int main(int argc, char **argv) {
         /* Derive reports base from data_dir: strip trailing /unified* */
         char reports_base[1024];
         snprintf(reports_base, sizeof(reports_base), "%s", data_dir);
-        char *p = strstr(reports_base, "/unified");
-        if (p) *p = '\0';
+        char *p = strstr(reports_base, "unified");
+        if (p) {
+            if (p > reports_base && (*(p-1) == '/' || *(p-1) == '\\'))
+                *(p-1) = '\0';
+            else
+                *p = '\0';
+        }
+        if (reports_base[0] == '\0' || strcmp(reports_base, ".") == 0) {
+            strcpy(reports_base, ".");
+        } else if (access(reports_base, F_OK) != 0) {
+            /* If the derived base doesn't exist, fallback to current dir
+             * to avoid creating nested 'test/singlestep/test/singlestep' paths. */
+            strcpy(reports_base, ".");
+        }
         snprintf(auto_dir, sizeof(auto_dir),
                  "%s/reports/%04d-%02d-%02d_%02d%02d%02d",
                  reports_base,
