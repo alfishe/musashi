@@ -676,6 +676,8 @@ extern sigjmp_buf m68ki_aerr_trap;
 				m68ki_remaining_cycles = 0; \
 			return m68ki_initial_cycles; \
 		} \
+		if(m68ki_remaining_cycles <= 0) \
+			return m68ki_initial_cycles - m68ki_remaining_cycles; \
 	}
 
 #define m68ki_check_address_error(ADDR, WRITE_MODE, FC) \
@@ -1942,12 +1944,12 @@ static inline void m68ki_stack_frame_buserr(uint sr)
 	m68ki_push_16(sr);
 	m68ki_push_16(REG_IR);
 	m68ki_push_32(m68ki_aerr_address);	/* access address */
-	/* 0 0 0 0 0 0 0 0 0 0 0 R/W I/N FC
-	 * R/W  0 = write, 1 = read
-	 * I/N  0 = instruction, 1 = not
-	 * FC   3-bit function code
+	/* Bits 0-4: R/W, I/N, FC (documented)
+	 * Bits 5-15: undocumented on real 68000 silicon — contain upper
+	 *            bits of the instruction register (REG_IR & 0xFFE0).
+	 *            Matches WinUAE: mode |= opcode & ~31;
 	 */
-	m68ki_push_16(m68ki_aerr_write_mode | CPU_INSTR_MODE | m68ki_aerr_fc);
+	m68ki_push_16((REG_IR & 0xffe0) | m68ki_aerr_write_mode | CPU_INSTR_MODE | m68ki_aerr_fc);
 }
 
 /* Format 8 stack frame (68010).

@@ -79,6 +79,14 @@ add_library(musashi_core STATIC
 )
 target_include_directories(musashi_core PUBLIC "${MUSASHI_ROOT}")
 target_compile_options(musashi_core PRIVATE -O2 -Wall)
+# Enable address error + prefetch emulation for SST tests — real 68000 has a
+# 2-word prefetch queue and generates address errors on odd-address word/long
+# accesses.  The default m68kconf.h has both OFF for co-simulation use; we
+# override them here via the #ifndef guards.
+target_compile_definitions(musashi_core PUBLIC
+    M68K_EMULATE_ADDRESS_ERROR=1
+    M68K_EMULATE_PREFETCH=1
+)
 # m68kops.c is generated; ensure the generator runs first
 set_source_files_properties(
     "${MUSASHI_ROOT}/m68kops.c" PROPERTIES GENERATED TRUE
