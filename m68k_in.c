@@ -1757,8 +1757,30 @@ M68KMAKE_OP(addx, 16, mm, .)
 
 M68KMAKE_OP(addx, 32, mm, .)
 {
-	uint src = OPER_AY_PD_32();
-	uint ea  = EA_AX_PD_32();
+	/* Silicon-accurate two-step pre-decrement for both source and destination.
+	 *
+	 * The real MC68000 performs a long-word pre-decrement access as two
+	 * separate word-bus cycles:
+	 *   1. Areg -= 2  (point to high word)  ← address error check HERE
+	 *   2. Areg -= 2  (point to low word)   ← then read/write all 32 bits
+	 *
+	 * If the address after step 1 is odd, the CPU raises an address error
+	 * before step 2, leaving Areg at (original - 2), NOT (original - 4).
+	 * The naive EA_AX_PD_32() / OPER_AY_PD_32() macros atomically subtract 4
+	 * before the alignment check, producing the wrong register value in the
+	 * exception frame.  Both source (Ay) and destination (Ax) must be split.
+	 *
+	 * Verified against Tom Harte SingleStepTests and WinUAE source.
+	 */
+	AY -= 2;
+	m68ki_check_address_error_010_less(AY, MODE_READ, FLAG_S | m68ki_get_address_space());
+	AY -= 2;
+	uint src = m68ki_read_32(AY);
+
+	AX -= 2;
+	m68ki_check_address_error_010_less(AX, MODE_READ, FLAG_S | m68ki_get_address_space());
+	AX -= 2;
+	uint ea  = AX;
 	uint dst = m68ki_read_32(ea);
 	uint res = src + dst + XFLAG_AS_1();
 
@@ -10524,8 +10546,22 @@ M68KMAKE_OP(subx, 16, mm, .)
 
 M68KMAKE_OP(subx, 32, mm, .)
 {
-	uint src = OPER_AY_PD_32();
-	uint ea  = EA_AX_PD_32();
+	/* Silicon-accurate two-step pre-decrement for both source and destination.
+	 * See addx 32 mm above for the full explanation.
+	 *
+	 * Short version: SUBX.l -(Ay),-(Ax) does each register's decrement in two
+	 * 2-byte steps.  An odd address after the first step raises an address
+	 * error leaving that register at (original - 2), not (original - 4).
+	 */
+	AY -= 2;
+	m68ki_check_address_error_010_less(AY, MODE_READ, FLAG_S | m68ki_get_address_space());
+	AY -= 2;
+	uint src = m68ki_read_32(AY);
+
+	AX -= 2;
+	m68ki_check_address_error_010_less(AX, MODE_READ, FLAG_S | m68ki_get_address_space());
+	AX -= 2;
+	uint ea  = AX;
 	uint dst = m68ki_read_32(ea);
 	uint res = dst - src - XFLAG_AS_1();
 
