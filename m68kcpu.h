@@ -513,9 +513,13 @@ typedef uint32 uint64;
 #define m68k_read_immediate_16(A) m68ki_read_program_16(A)
 #define m68k_read_immediate_32(A) m68ki_read_program_32(A)
 
-#define m68k_read_pcrelative_8(A) m68ki_read_program_8(A)
-#define m68k_read_pcrelative_16(A) m68ki_read_program_16(A)
-#define m68k_read_pcrelative_32(A) m68ki_read_program_32(A)
+/* On real 68000 hardware, (d16,PC) and (d8,PC,Xn) addressing modes read
+ * through the DATA bus (FC = supervisor/user data), not the program bus.
+ * The PC is merely used as the base address register; the access is a data
+ * fetch.  Using data-space FC here matches real hardware and WinUAE. */
+#define m68k_read_pcrelative_8(A)  m68ki_read_data_8(A)
+#define m68k_read_pcrelative_16(A) m68ki_read_data_16(A)
+#define m68k_read_pcrelative_32(A) m68ki_read_data_32(A)
 #endif /* M68K_SEPARATE_READS */
 
 
@@ -1937,10 +1941,16 @@ static inline void m68ki_stack_frame_0010(uint sr, uint vector)
 
 
 /* Bus error stack frame (68000 only).
+ *
+ * The 68000 prefetch pipeline keeps PC always 2 bytes ahead of the last
+ * decoded word.  When a data-access error fires, REG_PC already points
+ * past the word that triggered the fault, so the value to save in the
+ * exception frame is REG_PC - 2.  This matches the behaviour documented
+ * in WinUAE and verified by the Tom Harte SingleStepTests.
  */
 static inline void m68ki_stack_frame_buserr(uint sr)
 {
-	m68ki_push_32(REG_PC);
+	m68ki_push_32(REG_PC - 2);
 	m68ki_push_16(sr);
 	m68ki_push_16(REG_IR);
 	m68ki_push_32(m68ki_aerr_address);	/* access address */
