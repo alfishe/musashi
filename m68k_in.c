@@ -4700,7 +4700,9 @@ M68KMAKE_OP(divs, 16, ., d)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
+		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
 		FLAG_V = VFLAG_SET;
+		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
 	m68ki_exception_trap(EXCEPTION_ZERO_DIVIDE);
@@ -4738,7 +4740,9 @@ M68KMAKE_OP(divs, 16, ., .)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
+		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
 		FLAG_V = VFLAG_SET;
+		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
 	m68ki_exception_trap(EXCEPTION_ZERO_DIVIDE);
@@ -4764,7 +4768,9 @@ M68KMAKE_OP(divu, 16, ., d)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
+		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
 		FLAG_V = VFLAG_SET;
+		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
 	m68ki_exception_trap(EXCEPTION_ZERO_DIVIDE);
@@ -4790,7 +4796,9 @@ M68KMAKE_OP(divu, 16, ., .)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
+		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
 		FLAG_V = VFLAG_SET;
+		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
 	m68ki_exception_trap(EXCEPTION_ZERO_DIVIDE);
