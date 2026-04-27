@@ -880,11 +880,11 @@ extern jmp_buf m68ki_aerr_trap;
 #define EA_AY_AI_16()  EA_AY_AI_8()
 #define EA_AY_AI_32()  EA_AY_AI_8()
 #define EA_AY_PI_8()   (AY++)                                /* postincrement (size = byte) */
-#define EA_AY_PI_16()  ((AY+=2)-2)                           /* postincrement (size = word) */
-#define EA_AY_PI_32()  ((AY+=4)-4)                           /* postincrement (size = long) */
+#define EA_AY_PI_16()  m68ki_ea_ay_pi_16()                   /* postincrement (size = word) */
+#define EA_AY_PI_32()  m68ki_ea_ay_pi_32()                   /* postincrement (size = long) */
 #define EA_AY_PD_8()   (--AY)                                /* predecrement (size = byte) */
 #define EA_AY_PD_16()  (AY-=2)                               /* predecrement (size = word) */
-#define EA_AY_PD_32()  (AY-=4)                               /* predecrement (size = long) */
+#define EA_AY_PD_32()  m68ki_ea_ay_pd_32()                   /* predecrement (size = long) */
 #define EA_AY_DI_8()   (AY+MAKE_INT_16(m68ki_read_imm_16())) /* displacement */
 #define EA_AY_DI_16()  EA_AY_DI_8()
 #define EA_AY_DI_32()  EA_AY_DI_8()
@@ -896,11 +896,11 @@ extern jmp_buf m68ki_aerr_trap;
 #define EA_AX_AI_16()  EA_AX_AI_8()
 #define EA_AX_AI_32()  EA_AX_AI_8()
 #define EA_AX_PI_8()   (AX++)
-#define EA_AX_PI_16()  ((AX+=2)-2)
-#define EA_AX_PI_32()  ((AX+=4)-4)
+#define EA_AX_PI_16()  m68ki_ea_ax_pi_16()
+#define EA_AX_PI_32()  m68ki_ea_ax_pi_32()
 #define EA_AX_PD_8()   (--AX)
 #define EA_AX_PD_16()  (AX-=2)
-#define EA_AX_PD_32()  (AX-=4)
+#define EA_AX_PD_32()  m68ki_ea_ax_pd_32()
 #define EA_AX_DI_8()   (AX+MAKE_INT_16(m68ki_read_imm_16()))
 #define EA_AX_DI_16()  EA_AX_DI_8()
 #define EA_AX_DI_32()  EA_AX_DI_8()
@@ -1237,6 +1237,53 @@ extern const uint8    m68ki_ea_idx_cycle_table[];
 extern uint           m68ki_aerr_address;
 extern uint           m68ki_aerr_write_mode;
 extern uint           m68ki_aerr_fc;
+
+/* Effective Address Helpers for 68000/010 Address Error fidelity */
+static inline uint m68ki_ea_ay_pi_16(void)
+{
+	uint addr = AY;
+	AY += 2;
+	m68ki_check_address_error_010_less(addr, MODE_READ, FLAG_S | m68ki_get_address_space());
+	return addr;
+}
+
+static inline uint m68ki_ea_ay_pi_32(void)
+{
+	uint addr = AY;
+	AY += 4;
+	m68ki_check_address_error_010_less(addr, MODE_READ, FLAG_S | m68ki_get_address_space());
+	return addr;
+}
+
+static inline uint m68ki_ea_ay_pd_32(void)
+{
+	AY -= 4;
+	m68ki_check_address_error_010_less(AY, MODE_WRITE, FLAG_S | FUNCTION_CODE_USER_DATA);
+	return AY;
+}
+
+static inline uint m68ki_ea_ax_pi_16(void)
+{
+	uint addr = AX;
+	AX += 2;
+	m68ki_check_address_error_010_less(addr, MODE_READ, FLAG_S | m68ki_get_address_space());
+	return addr;
+}
+
+static inline uint m68ki_ea_ax_pi_32(void)
+{
+	uint addr = AX;
+	AX += 4;
+	m68ki_check_address_error_010_less(addr, MODE_READ, FLAG_S | m68ki_get_address_space());
+	return addr;
+}
+
+static inline uint m68ki_ea_ax_pd_32(void)
+{
+	AX -= 4;
+	m68ki_check_address_error_010_less(AX, MODE_WRITE, FLAG_S | FUNCTION_CODE_USER_DATA);
+	return AX;
+}
 
 /* Forward declarations to keep some of the macros happy */
 static inline uint m68ki_read_16_fc (uint address, uint fc);

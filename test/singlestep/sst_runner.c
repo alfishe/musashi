@@ -133,6 +133,11 @@ static int run_vector(const sst_vector_t *vec, file_result_t *res, int verbose) 
     m68k_set_reg(M68K_REG_ISP, vec->initial.regs[16]);
     m68k_set_reg(M68K_REG_PC, vec->initial.regs[18]);
 
+    /* Reset instruction mode to YES (0x00) to avoid contamination from 
+     * previous address error exceptions. On real silicon, every instruction 
+     * fetch starts in INSTRUCTION_YES mode. */
+    CPU_INSTR_MODE = INSTRUCTION_YES;
+
     /* Execute one instruction */
     m68k_execute(1);
 
