@@ -381,8 +381,27 @@ void setup_bootsec(void) {
         m68k_write_memory_32(i * 4, 0xdeadbeef);
 
     // Write the boot vectors
-    m68k_write_memory_32(0, 0x3F0);    // SP
-    m68k_write_memory_32(4, 0x10000);  // Entry
+    m68k_write_memory_32(0, 0x3F0);    // Vector  0: Reset SSP
+    m68k_write_memory_32(4, 0x10000);  // Vector  1: Reset PC (entry point)
+
+    /* Point bus-error and address-error vectors to TEST_FAIL (0x10022).
+     *
+     * The test binary (entry.s) intentionally leaves vectors 2 and 3 as
+     * 0xDEADBEEF so any unexpected exception causes an obvious crash.
+     * However, some tests (e.g. move.bin) deliberately trigger address
+     * errors to verify MOVE behaviour with odd addresses.  In that case
+     * the 68000 fetches the address-error vector from 0x000C; if that is
+     * also 0xDEADBEEF (unmapped), the resulting bus error then fetches
+     * the bus-error vector from 0x0008 — also 0xDEADBEEF — creating an
+     * infinite recursive bus-error loop that overflows the host C stack.
+     *
+     * TEST_FAIL is always linked at 0x10022 in these flat binaries
+     * (second instruction in entry.s after the reset vector setup).
+     * Routing the fault vectors there turns runaway recursion into a clean
+     * reported test failure instead of a segfault.
+     */
+    m68k_write_memory_32(0x0008, 0x10022); // Vector  2: Bus Error   -> TEST_FAIL
+    m68k_write_memory_32(0x000C, 0x10022); // Vector  3: Address Error -> TEST_FAIL
 }
 
 int main(int argc, char* argv[]) {
