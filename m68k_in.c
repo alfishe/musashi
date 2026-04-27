@@ -4634,6 +4634,7 @@ M68KMAKE_OP(dbf, 16, ., .)
 		REG_PC -= 2;
 		m68ki_trace_t0();			   /* auto-disable (see m68kcpu.h) */
 		m68ki_branch_16(offset);
+		m68ki_check_pc_address_error_010_less();
 		USE_CYCLES(CYC_DBCC_F_NOEXP);
 		return;
 	}

@@ -1258,7 +1258,7 @@ static inline uint m68ki_ea_ay_pi_32(void)
 static inline uint m68ki_ea_ay_pd_32(void)
 {
 	AY -= 4;
-	m68ki_check_address_error_010_less(AY, MODE_WRITE, FLAG_S | FUNCTION_CODE_USER_DATA);
+	m68ki_check_address_error_010_less(AY, MODE_READ, FLAG_S | FUNCTION_CODE_USER_DATA);
 	return AY;
 }
 
@@ -1281,7 +1281,7 @@ static inline uint m68ki_ea_ax_pi_32(void)
 static inline uint m68ki_ea_ax_pd_32(void)
 {
 	AX -= 4;
-	m68ki_check_address_error_010_less(AX, MODE_WRITE, FLAG_S | FUNCTION_CODE_USER_DATA);
+	m68ki_check_address_error_010_less(AX, MODE_READ, FLAG_S | FUNCTION_CODE_USER_DATA);
 	return AX;
 }
 
