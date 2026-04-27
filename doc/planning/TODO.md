@@ -4,9 +4,9 @@
 
 | Metric | Value |
 |--------|-------|
-| SST vectors passing | 983,582 / 1,000,060 |
-| SST files passing | 100 / 124 |
-| Binary tests (mc68000) | 59 / 60 (move.bin fails) |
+| SST vectors passing | 992,113 / 1,000,060 |
+| SST files passing | 116 / 124 |
+| Binary tests (mc68000) | 60 / 60 |
 
 ---
 
@@ -38,17 +38,26 @@ in 6 functions: `m68ki_ea_ay_pi_16`, `m68ki_ea_ay_pi_32`, `m68ki_ea_ay_pd_32`,
 **Fix**: Silicon-accurate flag computation.
 **Result**: ASR.b/l 8065/8065.
 
+### DBcc / DBF address error check (251 failures)
+**Fix**: Added `m68ki_check_pc_address_error_010_less()` to DBF handler (was
+present in DBcc but missing from DBF/DBRA).
+**Result**: DBcc 8065/8065.
+
+### Pre-decrement -(An) R/W mode in address error frame (~8,000 failures)
+**Fix**: Changed `MODE_WRITE` to `MODE_READ` in `m68ki_ea_ay_pd_32()` and
+`m68ki_ea_ax_pd_32()`. Real silicon reports MODE_READ because the faulting
+bus cycle is always a read (data read or RMW read phase).
+**Result**: 15 .l files now pass: ADD.l, ADDA.l, AND.l, CLR.l, CMP.l, CMPA.l,
+EOR.l, MOVEA.l, NEG.l, NEGX.l, NOT.l, OR.l, SUB.l, SUBA.l, TST.l.
+
+### Binary test harness — recursive exception fix + move.bin
+**Fix**: Route ALL exception vectors (2–63) to TEST_FAIL in setup_bootsec.
+Fix 68040-only CMPI PC-relative encoding in move.s to use LEA+CMP.
+**Result**: Binary tests 60/60 (was 59/60).
+
 ---
 
-## Priority 1: DBcc (251 failures)
-
-`SSP exp=0x000007F2 got=0x00000800` — stack frame pushed when it shouldn't be,
-or wrong size. The 68000 may handle DBcc address errors differently than a
-standard Group 0 exception.
-
----
-
-## Priority 2: MOVEM (821 failures)
+## Priority 1: MOVEM (821 failures)
 
 - MOVEM.w (426): `A0 exp=0x5B2BA541 got=0x5B2BA53F` — 2-byte delta
 - MOVEM.l (395): `A0 exp=0x91772AAD got=0x91772AAB` — 2-byte delta
@@ -58,18 +67,17 @@ MOVEM has its own post-increment logic that doesn't go through the generic
 
 ---
 
-## Priority 3: MOVE.l / MOVE.w (1,912 failures)
+## Priority 2: MOVE.l / MOVE.w (1,454 failures)
 
-- MOVE.l (1,214): Mix of stack frame content (X-flag) and register issues
+- MOVE.l (756): Mix of stack frame content and register issues
 - MOVE.w (698): Address register + SR + stack frame issues
 
-These are partially the X-flag-on-stack issue but also have MOVE-specific
-addressing mode interactions (source→destination with address error on
-destination write).
+These are partially related to addressing mode interactions (source→destination
+with address error on destination write).
 
 ---
 
-## Priority 4: MOVEfromSR (2,521 failures)
+## Priority 3: MOVEfromSR (2,521 failures)
 
 Stack frame + addressing issues. MOVEfromSR writes the SR value to a
 memory EA; if that EA triggers an address error, the stack frame content
@@ -77,7 +85,7 @@ may be wrong.
 
 ---
 
-## Priority 5: DIVS / DIVU SR flags (3,149 failures)
+## Priority 4: DIVS / DIVU SR flags (3,149 failures)
 
 - DIVS (1,900): `SR exp=0x2702 got=0x2703` — V or C flag wrong
 - DIVU (1,249): `SR exp=0x2716 got=0x2717` — V or C flag wrong
@@ -87,18 +95,7 @@ mode issues.
 
 ---
 
-## Priority 6: X-flag on stack (~8,000 failures across 15 .l files)
-
-When an address error occurs during a `.l` instruction using `-(An)`, the SR
-pushed onto the exception stack frame has the wrong X flag (bit 4). This
-affects: ADD.l, AND.l, CLR.l, CMP.l, CMPA.l, EOR.l, NEG.l, NEGX.l, NOT.l,
-OR.l, SUB.l, SUBA.l, ADDA.l, TST.l, MOVEA.l.
-
-Pattern: `RAM@0x0007F3 exp=0xB5 got=0xA5` (bit 4 = X flag wrong).
-
----
-
-## Priority 7: ASL.b — 2 corrupt Tom Harte vectors (WONTFIX)
+## Priority 5: ASL.b — 2 corrupt Tom Harte vectors (WONTFIX)
 
 Vectors 1583 and 1761 in `ASL.b.json.gz` have corrupt expected D2 values —
 all 32 bits change for a byte-size shift, which is architecturally impossible.
