@@ -96,7 +96,8 @@ MOVE2:      mov.b  (WORK_LOC+5) , 7(%a0,%d1.w)    /* BYTE  */
             mov.b  MOVE1(%pc,%d3), (WORK_LOCB) /* BYTE  */
             beq TEST_FAIL                       /* Check Z Flag  beq/bne*/
             bpl TEST_FAIL                       /* Check N Flag  bmi/bpl*/
-            cmpi.b #0xB9 ,1+MOVE2               /* Make sure we tested the right opcode above*/
+            lea 1+MOVE2 , %a6
+            cmpi.b #0xB9 , (%a6)                  /* Make sure we tested the right opcode above*/
             bne TEST_FAIL                       /* Check Z Flag  beq/bne*/
                     
     /* #x -->    n(An,AL)*/
@@ -137,7 +138,8 @@ MOVE1:      mov.w  (WORK_LOC+4) , 6(%a0,%d1.w)    /* WORD  */
             mov.w  MOVE1(%pc,%d3), (WORK_LOCB) /* WORD  */
             beq TEST_FAIL                       /* Check Z Flag  beq/bne*/
             bmi TEST_FAIL                       /* Check N Flag  bmi/bpl*/
-            cmpi.w #0x31B9, MOVE1
+            lea MOVE1 , %a6
+            cmpi.w #0x31B9, (%a6)
             bne TEST_FAIL                       /* Check Z Flag  beq/bne*/
                     
     /* #x -->    n(An,AL)*/
@@ -180,7 +182,8 @@ MOVE3:      mov.l  (WORK_LOC+4) , 6(%a0,%d1.w)    /* LONG  */
             mov.l  MOVE3(%pc,%d3), (WORK_LOCB) /* LONG  */
             beq TEST_FAIL                       /* Check Z Flag  beq/bne*/
             bmi TEST_FAIL                       /* Check N Flag  bmi/bpl*/
-            cmpi.l #0x21B90000+WORK_LOC_HI, MOVE3          /* Ensure we tested the right opcode above*/
+            lea MOVE3 , %a6
+            cmpi.l #0x21B90000+WORK_LOC_HI, (%a6) /* Ensure we tested the right opcode above*/
             bne TEST_FAIL                       /* Check Z Flag  beq/bne*/
                     
     /* #x -->    n(An,AL)*/
