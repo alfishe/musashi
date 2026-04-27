@@ -7492,9 +7492,21 @@ M68KMAKE_OP(movem, 16, er, pi)
 	uint ea = AY;
 	uint count = 0;
 
+	/* Pre-increment AY before each read for address error fidelity.
+	 *
+	 * On the 68000, if the starting address is odd, the bus access
+	 * triggers an address error via siglongjmp.  The longjmp skips
+	 * the "AY = ea" assignment at the end, so AY must already hold
+	 * the correct faulting-state value.  Real silicon shows An
+	 * advanced by one word (2 bytes) past the faulting address.
+	 *
+	 * In the non-fault path, "AY = ea" after the loop overwrites
+	 * the incremental updates with the final post-increment value.
+	 */
 	for(; i < 16; i++)
 		if(register_list & (1 << i))
 		{
+			AY += 2;
 			REG_DA[i] = MAKE_INT_16(MASK_OUT_ABOVE_16(m68ki_read_16(ea)));
 			ea += 2;
 			count++;
@@ -7569,9 +7581,23 @@ M68KMAKE_OP(movem, 32, er, pi)
 	uint ea = AY;
 	uint count = 0;
 
+	/* Pre-increment AY by 2 (not 4) before each read for address
+	 * error fidelity.
+	 *
+	 * On the 68000, a 32-bit read is two 16-bit bus cycles.  When
+	 * the starting address (ea) is odd, the first word access at ea
+	 * triggers an address error via siglongjmp.  At that point, real
+	 * silicon shows An advanced by one word (ea + 2), NOT one long
+	 * (ea + 4).  The "+2" matches the 68000's internal pointer
+	 * advancing one word into the transfer before faulting.
+	 *
+	 * In the non-fault path, "AY = ea" after the loop overwrites
+	 * the incremental updates with the final post-increment value.
+	 */
 	for(; i < 16; i++)
 		if(register_list & (1 << i))
 		{
+			AY += 2;
 			REG_DA[i] = m68ki_read_32(ea);
 			ea += 4;
 			count++;
