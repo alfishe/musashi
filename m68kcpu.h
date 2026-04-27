@@ -727,10 +727,41 @@ extern jmp_buf m68ki_aerr_trap;
 		{ \
 			m68ki_check_address_error(ADDR, WRITE_MODE, FC) \
 		}
+
+	/* Check whether the PC just loaded by a branch or return instruction is
+	 * odd, and if so fire an address error as the 68000 would when it tries
+	 * to do the first instruction prefetch at the new (odd) address.
+	 *
+	 * Calling convention (must be invoked while REG_PC == the odd target):
+	 *   - aerr_address is set to the odd target address (the fault address
+	 *     that appears in the exception stack frame).
+	 *   - REG_PC is decremented by 2 BEFORE the longjmp so that
+	 *     m68ki_stack_frame_buserr() stores REG_PC-2 = target-4 in the
+	 *     frame's PC field.  This matches the real 68000 pipeline which has
+	 *     already advanced two words past the branch target before the fault
+	 *     handler captures the PC (verified against Tom Harte SingleStepTests).
+	 *   - CPU_INSTR_MODE is set to INSTRUCTION_NO (0x08) because on real
+	 *     silicon the branch-target prefetch occurs after the instruction-
+	 *     fetch phase has completed.  The I/N bit (bit 3) in the bus error
+	 *     status word therefore reads 1 ("not instruction fetch").
+	 *   - write_mode = MODE_READ (instruction fetch is always a read).
+	 *   - FC = FLAG_S | FUNCTION_CODE_USER_PROGRAM, which resolves to
+	 *     FUNCTION_CODE_SUPERVISOR_PROGRAM (6) in supervisor mode and
+	 *     FUNCTION_CODE_USER_PROGRAM (2) in user mode, matching silicon.
+	 */
+	#define m68ki_check_pc_address_error_010_less() \
+		if(CPU_TYPE_IS_010_LESS(CPU_TYPE) && (REG_PC & 1)) \
+		{ \
+			uint _odd_pc = REG_PC; \
+			REG_PC -= 2; \
+			CPU_INSTR_MODE = INSTRUCTION_NO; \
+			m68ki_check_address_error(_odd_pc, MODE_READ, FLAG_S | FUNCTION_CODE_USER_PROGRAM) \
+		}
 #else
 	#define m68ki_set_address_error_trap()
 	#define m68ki_check_address_error(ADDR, WRITE_MODE, FC)
 	#define m68ki_check_address_error_010_less(ADDR, WRITE_MODE, FC)
+	#define m68ki_check_pc_address_error_010_less()
 #endif /* M68K_ADDRESS_ERROR */
 
 /* Logging */

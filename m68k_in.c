@@ -3358,6 +3358,12 @@ M68KMAKE_OP(bsr, 8, ., .)
 	m68ki_trace_t0();				   /* auto-disable (see m68kcpu.h) */
 	m68ki_push_32(REG_PC);
 	m68ki_branch_8(MASK_OUT_ABOVE_8(REG_IR));
+	/* On the real 68000 the CPU immediately prefetches the first instruction
+	 * word at the branch target.  If that address is odd the prefetch faults
+	 * with an address error before the branch logically completes, so the
+	 * exception is visible to a single-step harness as part of BSR itself.
+	 */
+	m68ki_check_pc_address_error_010_less();
 }
 
 
@@ -3368,6 +3374,8 @@ M68KMAKE_OP(bsr, 16, ., .)
 	m68ki_push_32(REG_PC);
 	REG_PC -= 2;
 	m68ki_branch_16(offset);
+	/* Same odd-target prefetch fault as BSR.b — see comment there. */
+	m68ki_check_pc_address_error_010_less();
 }
 
 
@@ -3387,6 +3395,11 @@ M68KMAKE_OP(bsr, 32, ., .)
 		m68ki_trace_t0();				   /* auto-disable (see m68kcpu.h) */
 		m68ki_push_32(REG_PC);
 		m68ki_branch_8(MASK_OUT_ABOVE_8(REG_IR));
+		/* Same odd-target prefetch fault as BSR.b — see comment there.
+		 * Only applies to 68000/68010; the 020+ path above is
+		 * 32-bit and uses a full displacement, no odd-PC check needed
+		 * (020 does not fault on odd instruction addresses). */
+		m68ki_check_pc_address_error_010_less();
 	}
 }
 
@@ -9675,6 +9688,11 @@ M68KMAKE_OP(rte, 32, ., .)
 			new_sr = m68ki_pull_16();
 			new_pc = m68ki_pull_32();
 			m68ki_jump(new_pc);
+			/* If the stacked PC is odd the 68000 prefetch faults immediately
+			 * on the return — the exception is visible as part of RTE itself.
+			 * Check before m68ki_set_sr() so the FC reflects the mode that
+			 * was active when the fault would have occurred. */
+			m68ki_check_pc_address_error_010_less();
 			m68ki_set_sr(new_sr);
 
 			CPU_INSTR_MODE = INSTRUCTION_YES;
@@ -9790,6 +9808,8 @@ M68KMAKE_OP(rtr, 32, ., .)
 	m68ki_trace_t0();				   /* auto-disable (see m68kcpu.h) */
 	m68ki_set_ccr(m68ki_pull_16());
 	m68ki_jump(m68ki_pull_32());
+	/* Same odd-return-address check as RTS — see comment there. */
+	m68ki_check_pc_address_error_010_less();
 }
 
 
@@ -9797,6 +9817,11 @@ M68KMAKE_OP(rts, 32, ., .)
 {
 	m68ki_trace_t0();				   /* auto-disable (see m68kcpu.h) */
 	m68ki_jump(m68ki_pull_32());
+	/* If the return address on the stack was odd the 68000 fires an address
+	 * error on the instruction prefetch exactly as it does for a BSR to an
+	 * odd address — the exception is visible as part of the RTS itself.
+	 */
+	m68ki_check_pc_address_error_010_less();
 }
 
 
