@@ -663,13 +663,67 @@ typedef uint32 uint64;
 
 
 
-/* Address error */
+/* ======================== Address Error Emulation ========================
+ *
+ * On the 68000, word and long-word accesses to odd addresses generate an
+ * Address Error exception (vector 3), which pushes a 14-byte "bus error"
+ * stack frame onto the supervisor stack and transfers control to the
+ * exception handler.
+ *
+ * Musashi implements this via non-local jumps (setjmp/longjmp):
+ *
+ *   1. m68ki_set_address_error_trap()  — called once at the top of the
+ *      m68k_execute() loop.  Establishes the catch point via sigsetjmp()
+ *      (BSD) or setjmp() (POSIX).  When a longjmp fires, execution lands
+ *      here, which calls m68ki_exception_address_error() to push the
+ *      14-byte frame and vector through exception 3.
+ *
+ *   2. m68ki_check_address_error()  — the low-level guard macro.  Tests
+ *      an address for odd alignment; if odd, populates the three global
+ *      error-state variables (m68ki_aerr_address, m68ki_aerr_write_mode,
+ *      m68ki_aerr_fc) and fires the longjmp to the trap established in (1).
+ *      This is called automatically from m68ki_read_imm_16(),
+ *      m68ki_read_*(), and m68ki_write_*() for every memory access.
+ *
+ *   3. m68ki_check_address_error_010_less()  — thin wrapper around (2)
+ *      that gates the check on CPU_TYPE_IS_010_LESS().  The 68020+
+ *      support misaligned accesses natively, so the check is skipped.
+ *
+ *   4. m68ki_check_pc_address_error_010_less()  — specialized check for
+ *      branch and return instructions (BSR, RTS, RTR, RTE).  When these
+ *      instructions compute an odd target PC, the real 68000 faults on
+ *      the first instruction prefetch at that address.  This macro
+ *      simulates that by adjusting REG_PC, setting the I/N flag, and
+ *      firing the longjmp.  See the detailed comment block above its
+ *      definition for the full calling convention.
+ *
+ * Two implementations exist for portability:
+ *   - BSD (_BSD_SETJMP_H defined):  Uses sigsetjmp()/siglongjmp() with
+ *     savesigs=0 to avoid the expensive signal-mask save that plain
+ *     setjmp() performs on macOS and *BSD.
+ *   - Standard (fallback):  Uses setjmp()/longjmp().
+ *
+ * When M68K_EMULATE_ADDRESS_ERROR is disabled, all four macros expand
+ * to empty statements (lines at the bottom of this block).
+ * ====================================================================== */
+
 #if M68K_EMULATE_ADDRESS_ERROR
 	#include <setjmp.h>
 
-/* sigjmp() on Mac OS X and *BSD in general saves signal contexts and is super-slow, use sigsetjmp() to tell it not to */
+/* ---- BSD variant: sigsetjmp/siglongjmp (macOS, FreeBSD, etc.) --------
+ * sigsetjmp(buf, 0) avoids saving/restoring the signal mask on every
+ * call, which makes it ~10x faster than plain setjmp() on these platforms.
+ */
 #ifdef _BSD_SETJMP_H
 extern sigjmp_buf m68ki_aerr_trap;
+
+/* Trap setup — called once at the top of m68k_execute().
+ * sigsetjmp returns 0 on initial setup.  When siglongjmp fires (from
+ * m68ki_check_address_error), it returns non-zero and we fall into the
+ * exception handler.  After the exception processes, if the CPU is
+ * halted we return immediately; if cycles are exhausted we also return;
+ * otherwise we fall through back into the execute loop.
+ */
 #define m68ki_set_address_error_trap(m68k) \
 	if(sigsetjmp(m68ki_aerr_trap, 0) != 0) \
 	{ \
@@ -684,6 +738,13 @@ extern sigjmp_buf m68ki_aerr_trap;
 			return m68ki_initial_cycles - m68ki_remaining_cycles; \
 	}
 
+/* Low-level guard — test address alignment and fire the trap.
+ * Populates the three global error-state variables that
+ * m68ki_stack_frame_buserr() reads when building the 14-byte frame:
+ *   - m68ki_aerr_address    → fault address field
+ *   - m68ki_aerr_write_mode → R/W bit (MODE_READ=0x10, MODE_WRITE=0x00)
+ *   - m68ki_aerr_fc         → function code (user/supervisor, program/data)
+ */
 #define m68ki_check_address_error(ADDR, WRITE_MODE, FC) \
 	if((ADDR)&1) \
 	{ \
@@ -692,8 +753,15 @@ extern sigjmp_buf m68ki_aerr_trap;
 		m68ki_aerr_fc = FC; \
 		siglongjmp(m68ki_aerr_trap, 1); \
 	}
+
+/* ---- Standard variant: setjmp/longjmp (Linux, Windows, etc.) -------- */
 #else
 extern jmp_buf m68ki_aerr_trap;
+
+	/* Trap setup — same logic as the BSD variant above, but using
+	 * standard setjmp()/longjmp() which may save signal masks on some
+	 * platforms (slightly slower but universally portable).
+	 */
 	#define m68ki_set_address_error_trap() \
 		if(setjmp(m68ki_aerr_trap) != 0) \
 		{ \
@@ -712,6 +780,9 @@ extern jmp_buf m68ki_aerr_trap;
 			} \
 		}
 
+	/* Low-level guard — identical logic to the BSD variant, but fires
+	 * longjmp() instead of siglongjmp().
+	 */
 	#define m68ki_check_address_error(ADDR, WRITE_MODE, FC) \
 		if((ADDR)&1) \
 		{ \
@@ -722,6 +793,10 @@ extern jmp_buf m68ki_aerr_trap;
 		}
 #endif
 
+	/* CPU-type-gated wrapper — only fires on 68000/68010 where
+	 * misaligned word/long accesses are illegal.  The 68020+ handle
+	 * misaligned accesses in hardware, so the check is skipped.
+	 */
 	#define m68ki_check_address_error_010_less(ADDR, WRITE_MODE, FC) \
 		if (CPU_TYPE_IS_010_LESS(CPU_TYPE)) \
 		{ \
@@ -757,6 +832,8 @@ extern jmp_buf m68ki_aerr_trap;
 			CPU_INSTR_MODE = INSTRUCTION_NO; \
 			m68ki_check_address_error(_odd_pc, MODE_READ, FLAG_S | FUNCTION_CODE_USER_PROGRAM) \
 		}
+
+/* ---- Disabled stubs ------------------------------------------------- */
 #else
 	#define m68ki_set_address_error_trap()
 	#define m68ki_check_address_error(ADDR, WRITE_MODE, FC)

@@ -9688,12 +9688,19 @@ M68KMAKE_OP(rte, 32, ., .)
 			new_sr = m68ki_pull_16();
 			new_pc = m68ki_pull_32();
 			m68ki_jump(new_pc);
-			/* If the stacked PC is odd the 68000 prefetch faults immediately
-			 * on the return — the exception is visible as part of RTE itself.
-			 * Check before m68ki_set_sr() so the FC reflects the mode that
-			 * was active when the fault would have occurred. */
-			m68ki_check_pc_address_error_010_less();
+			/* On real 68000 silicon, the stacked SR is applied BEFORE the
+			 * first instruction prefetch at the new PC.  This means:
+			 *   1. If the new PC is odd, the address error exception's stack
+			 *      frame will contain the restored SR (not the pre-RTE SR).
+			 *   2. The FC field in the bus error status word reflects the
+			 *      privilege mode from the restored SR (e.g. FC=2 if the
+			 *      stacked SR had S=0, FC=6 if S=1).
+			 * Therefore m68ki_set_sr() MUST be called before the address
+			 * error check — if the check fires (longjmp), any code after
+			 * it is never reached.
+			 */
 			m68ki_set_sr(new_sr);
+			m68ki_check_pc_address_error_010_less();
 
 			CPU_INSTR_MODE = INSTRUCTION_YES;
 			CPU_RUN_MODE = RUN_MODE_NORMAL;
