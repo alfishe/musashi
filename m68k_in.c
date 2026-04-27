@@ -2083,22 +2083,55 @@ M68KMAKE_OP(asr, 8, r, .)
 			return;
 		}
 
+		/* ---------------------------------------------------------------
+		 * Silicon-accurate C/X flag behaviour when shift count >= 8 (byte).
+		 *
+		 * Motorola 68000 Programmer's Reference Manual (§4-22) states:
+		 *   "The C bit is set to the last bit shifted out of the operand"
+		 *   "The X bit is set or cleared the same as the C bit"
+		 *
+		 * For a BYTE operand, ASR shifts the sign bit in from the left
+		 * on every cycle.  The bit that exits on the right is:
+		 *
+		 *   count < 8:  bit[count-1] of the original src (normal path above)
+		 *   count == 8: the sign bit (MSB) is the 8th and last bit to exit
+		 *   count > 8:  the register is saturated with the sign bit; there are
+		 *               no further data bits to shift out -> C = X = 0
+		 *
+		 * The original Musashi code took the `shift >= 8` branch and set
+		 * FLAG_C = CFLAG_SET whenever GET_MSB_8(src) was true, without
+		 * distinguishing count==8 from count>8.  This was wrong for count>8:
+		 * the sign bit had already exited on cycle 8, so subsequent shifts
+		 * produce C = X = 0 regardless of the operand sign.
+		 *
+		 * Fix: compute result (N/Z) from MSB as before, then:
+		 *   if count == 8  -> C = X = MSB of src (sign bit was the last out)
+		 *   if count  > 8  -> C = X = 0
+		 *
+		 * Verified against Tom Harte MC68000 SingleStepTests (ASR.b, 8065
+		 * vectors).  Same fix applies to ASR.w (count >= 16) and ASR.l
+		 * (count >= 32) - see those handlers below.
+		 * --------------------------------------------------------------- */
 		if(GET_MSB_8(src))
 		{
 			*r_dst |= 0xff;
-			FLAG_C = CFLAG_SET;
-			FLAG_X = XFLAG_SET;
 			FLAG_N = NFLAG_SET;
 			FLAG_Z = ZFLAG_CLEAR;
-			FLAG_V = VFLAG_CLEAR;
-			return;
+		} else {
+			*r_dst &= 0xffffff00;
+			FLAG_N = NFLAG_CLEAR;
+			FLAG_Z = ZFLAG_SET;
 		}
-
-		*r_dst &= 0xffffff00;
-		FLAG_C = CFLAG_CLEAR;
-		FLAG_X = XFLAG_CLEAR;
-		FLAG_N = NFLAG_CLEAR;
-		FLAG_Z = ZFLAG_SET;
+		/* For count==8, the sign bit is the last to exit; C=X=MSB(src).
+		 * For count>8, the register is already saturated; C=X=0. */
+		if(shift == 8)
+		{
+			FLAG_C = GET_MSB_8(src) ? CFLAG_SET : CFLAG_CLEAR;
+			FLAG_X = GET_MSB_8(src) ? XFLAG_SET : XFLAG_CLEAR;
+		} else {
+			FLAG_C = CFLAG_CLEAR;
+			FLAG_X = XFLAG_CLEAR;
+		}
 		FLAG_V = VFLAG_CLEAR;
 		return;
 	}
@@ -2136,22 +2169,30 @@ M68KMAKE_OP(asr, 16, r, .)
 			return;
 		}
 
+		/* Silicon-accurate C/X for count >= 16 (word operand).
+		 * After 16 ASR shifts every bit is the sign bit; for count > 16
+		 * nothing new exits the shifter -> C = X = 0.
+		 * At count == 16 exactly, the sign bit (MSB) was the last to exit.
+		 * See the full explanation in asr_8_r above.
+		 */
 		if(GET_MSB_16(src))
 		{
 			*r_dst |= 0xffff;
-			FLAG_C = CFLAG_SET;
-			FLAG_X = XFLAG_SET;
 			FLAG_N = NFLAG_SET;
 			FLAG_Z = ZFLAG_CLEAR;
-			FLAG_V = VFLAG_CLEAR;
-			return;
+		} else {
+			*r_dst &= 0xffff0000;
+			FLAG_N = NFLAG_CLEAR;
+			FLAG_Z = ZFLAG_SET;
 		}
-
-		*r_dst &= 0xffff0000;
-		FLAG_C = CFLAG_CLEAR;
-		FLAG_X = XFLAG_CLEAR;
-		FLAG_N = NFLAG_CLEAR;
-		FLAG_Z = ZFLAG_SET;
+		if(shift == 16)
+		{
+			FLAG_C = GET_MSB_16(src) ? CFLAG_SET : CFLAG_CLEAR;
+			FLAG_X = GET_MSB_16(src) ? XFLAG_SET : XFLAG_CLEAR;
+		} else {
+			FLAG_C = CFLAG_CLEAR;
+			FLAG_X = XFLAG_CLEAR;
+		}
 		FLAG_V = VFLAG_CLEAR;
 		return;
 	}
@@ -2189,22 +2230,30 @@ M68KMAKE_OP(asr, 32, r, .)
 			return;
 		}
 
+		/* Silicon-accurate C/X for count >= 32 (long-word operand).
+		 * After 32 ASR shifts every bit is the sign bit; for count 33-63
+		 * nothing new exits the shifter -> C = X = 0.
+		 * At count == 32 exactly, the sign bit (MSB) was the last to exit.
+		 * See the full explanation in asr_8_r above.
+		 */
 		if(GET_MSB_32(src))
 		{
 			*r_dst = 0xffffffff;
-			FLAG_C = CFLAG_SET;
-			FLAG_X = XFLAG_SET;
 			FLAG_N = NFLAG_SET;
 			FLAG_Z = ZFLAG_CLEAR;
-			FLAG_V = VFLAG_CLEAR;
-			return;
+		} else {
+			*r_dst = 0;
+			FLAG_N = NFLAG_CLEAR;
+			FLAG_Z = ZFLAG_SET;
 		}
-
-		*r_dst = 0;
-		FLAG_C = CFLAG_CLEAR;
-		FLAG_X = XFLAG_CLEAR;
-		FLAG_N = NFLAG_CLEAR;
-		FLAG_Z = ZFLAG_SET;
+		if(shift == 32)
+		{
+			FLAG_C = GET_MSB_32(src) ? CFLAG_SET : CFLAG_CLEAR;
+			FLAG_X = GET_MSB_32(src) ? XFLAG_SET : XFLAG_CLEAR;
+		} else {
+			FLAG_C = CFLAG_CLEAR;
+			FLAG_X = XFLAG_CLEAR;
+		}
 		FLAG_V = VFLAG_CLEAR;
 		return;
 	}
