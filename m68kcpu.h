@@ -2378,6 +2378,21 @@ static inline void m68ki_exception_trap(uint vector)
 	USE_CYCLES(CYC_EXCEPTION[vector] - CYC_INSTRUCTION[REG_IR]);
 }
 
+static inline void m68ki_exception_trap_pc(uint vector, uint pc)
+{
+	uint sr = m68ki_init_exception();
+
+	if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+		m68ki_stack_frame_0000(pc, sr, vector);
+	else
+		m68ki_stack_frame_0010(sr, vector);
+
+	m68ki_jump_vector(vector);
+
+	/* Use up some clock cycles and undo the instruction's cycles */
+	USE_CYCLES(CYC_EXCEPTION[vector] - CYC_INSTRUCTION[REG_IR]);
+}
+
 /* Trap#n stacks a 0 frame but behaves like group2 otherwise */
 static inline void m68ki_exception_trapN(uint vector)
 {

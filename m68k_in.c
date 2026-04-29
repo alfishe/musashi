@@ -4705,7 +4705,11 @@ M68KMAKE_OP(divs, 16, ., d)
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-	m68ki_exception_trap(EXCEPTION_ZERO_DIVIDE);
+		FLAG_C = CFLAG_CLEAR;
+		FLAG_V = VFLAG_CLEAR;
+		FLAG_Z = ZFLAG_CLEAR;
+		FLAG_N = NFLAG_CLEAR;
+		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
@@ -4745,7 +4749,11 @@ M68KMAKE_OP(divs, 16, ., .)
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-	m68ki_exception_trap(EXCEPTION_ZERO_DIVIDE);
+		FLAG_C = CFLAG_CLEAR;
+		FLAG_V = VFLAG_CLEAR;
+		FLAG_Z = ZFLAG_CLEAR;
+		FLAG_N = NFLAG_CLEAR;
+		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
@@ -4773,7 +4781,11 @@ M68KMAKE_OP(divu, 16, ., d)
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-	m68ki_exception_trap(EXCEPTION_ZERO_DIVIDE);
+		FLAG_C = CFLAG_CLEAR;
+		FLAG_V = VFLAG_CLEAR;
+		FLAG_Z = ZFLAG_CLEAR;
+		FLAG_N = NFLAG_CLEAR;
+		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
@@ -4801,7 +4813,11 @@ M68KMAKE_OP(divu, 16, ., .)
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-	m68ki_exception_trap(EXCEPTION_ZERO_DIVIDE);
+		FLAG_C = CFLAG_CLEAR;
+		FLAG_V = VFLAG_CLEAR;
+		FLAG_Z = ZFLAG_CLEAR;
+		FLAG_N = NFLAG_CLEAR;
+		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
@@ -4886,7 +4902,7 @@ M68KMAKE_OP(divl, 32, ., d)
 			FLAG_C = CFLAG_CLEAR;
 			return;
 		}
-		m68ki_exception_trap(EXCEPTION_ZERO_DIVIDE);
+		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 		return;
 	}
 	m68ki_exception_illegal();
@@ -5030,7 +5046,7 @@ M68KMAKE_OP(divl, 32, ., d)
 			FLAG_C = CFLAG_CLEAR;
 			return;
 		}
-		m68ki_exception_trap(EXCEPTION_ZERO_DIVIDE);
+		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 		return;
 	}
 	m68ki_exception_illegal();
@@ -5120,7 +5136,7 @@ M68KMAKE_OP(divl, 32, ., .)
 			FLAG_C = CFLAG_CLEAR;
 			return;
 		}
-		m68ki_exception_trap(EXCEPTION_ZERO_DIVIDE);
+		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 		return;
 	}
 	m68ki_exception_illegal();
@@ -5264,7 +5280,7 @@ M68KMAKE_OP(divl, 32, ., .)
 			FLAG_C = CFLAG_CLEAR;
 			return;
 		}
-		m68ki_exception_trap(EXCEPTION_ZERO_DIVIDE);
+		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 		return;
 	}
 	m68ki_exception_illegal();
