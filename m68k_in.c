@@ -6617,6 +6617,10 @@ M68KMAKE_OP(move, 16, al, .)
 	m68ki_aerr_pc_offset = 0;
 
 }
+/* NOTE: The generated m68k_op_move_16_al_i() in m68kops.c must have the
+ * m68ki_aerr_pc_offset lines removed (set to 0/no offset). Immediate source
+ * reads all extension words before the write, so REG_PC is fully advanced.
+ * m68kmake cannot express per-subvariant overrides of the '.' template. */
 
 
 M68KMAKE_OP(move, 32, d, d)
@@ -6983,6 +6987,10 @@ M68KMAKE_OP(move, 32, al, .)
 	m68ki_aerr_pc_offset = 0;
 
 }
+/* NOTE: The generated m68k_op_move_32_al_i() in m68kops.c must have the
+ * m68ki_aerr_pc_offset lines removed (set to 0/no offset). Immediate source
+ * reads all extension words before the write, so REG_PC is fully advanced.
+ * m68kmake cannot express per-subvariant overrides of the '.' template. */
 
 
 M68KMAKE_OP(movea, 16, ., d)
