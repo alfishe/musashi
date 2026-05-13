@@ -6584,9 +6584,7 @@ M68KMAKE_OP(move, 16, al, d)
 	FLAG_Z = res;
 	FLAG_V = VFLAG_CLEAR;
 	FLAG_C = CFLAG_CLEAR;
-	m68ki_aerr_pc_offset = -2;
 	m68ki_write_16(ea, res);
-	m68ki_aerr_pc_offset = 0;
 
 }
 
@@ -6600,9 +6598,7 @@ M68KMAKE_OP(move, 16, al, a)
 	FLAG_Z = res;
 	FLAG_V = VFLAG_CLEAR;
 	FLAG_C = CFLAG_CLEAR;
-	m68ki_aerr_pc_offset = -2;
 	m68ki_write_16(ea, res);
-	m68ki_aerr_pc_offset = 0;
 
 }
 

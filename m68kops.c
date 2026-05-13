@@ -20816,9 +20816,7 @@ static void m68k_op_move_16_al_d(void)
 	FLAG_Z = res;
 	FLAG_V = VFLAG_CLEAR;
 	FLAG_C = CFLAG_CLEAR;
-	m68ki_aerr_pc_offset = -2;
 	m68ki_write_16(ea, res);
-	m68ki_aerr_pc_offset = 0;
 
 }
 
@@ -20832,9 +20830,7 @@ static void m68k_op_move_16_al_a(void)
 	FLAG_Z = res;
 	FLAG_V = VFLAG_CLEAR;
 	FLAG_C = CFLAG_CLEAR;
-	m68ki_aerr_pc_offset = -2;
 	m68ki_write_16(ea, res);
-	m68ki_aerr_pc_offset = 0;
 
 }
 
@@ -20992,9 +20988,7 @@ static void m68k_op_move_16_al_i(void)
 	FLAG_Z = res;
 	FLAG_V = VFLAG_CLEAR;
 	FLAG_C = CFLAG_CLEAR;
-	m68ki_aerr_pc_offset = -2;
 	m68ki_write_16(ea, res);
-	m68ki_aerr_pc_offset = 0;
 
 }
 
@@ -22464,9 +22458,7 @@ static void m68k_op_move_32_al_i(void)
 	FLAG_Z = res;
 	FLAG_V = VFLAG_CLEAR;
 	FLAG_C = CFLAG_CLEAR;
-	m68ki_aerr_pc_offset = -2;
 	m68ki_write_32(ea, res);
-	m68ki_aerr_pc_offset = 0;
 
 }
 
