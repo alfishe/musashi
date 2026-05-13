@@ -1267,11 +1267,21 @@ extern int            m68ki_aerr_pc_offset;
 extern int            m68ki_aerr_restore_reg;  /* REGISTER INDEX (0-7), NOT value! Use (REG_IR>>9)&7 for AX idx, REG_IR&7 for AY idx */
 extern int            m68ki_aerr_restore_val;
 
-/* Effective Address Helpers for 68000/010 Address Error fidelity */
+/* Effective Address Helpers for 68000/010 Address Error fidelity.
+ * Post-increment (pi) and pre-decrement (pd) variants modify the
+ * address register BEFORE the actual memory access.  If the access
+ * triggers an address error, we must undo the modification.
+ * We use m68ki_aerr_restore_reg/val — same mechanism that write-side
+ * handlers use — so the longjmp handler in m68ki_check_address_error()
+ * can restore the register automatically.
+ * SAFETY: REG_IR & 7 gives the AY index (0-7), (REG_IR>>9)&7 for AX.
+ */
 static inline uint m68ki_ea_ay_pi_16(void)
 {
 	uint addr = AY;
 	AY += 2;
+	m68ki_aerr_restore_reg = REG_IR & 7;
+	m68ki_aerr_restore_val = -2;
 	return addr;
 }
 
@@ -1279,12 +1289,16 @@ static inline uint m68ki_ea_ay_pi_32(void)
 {
 	uint addr = AY;
 	AY += 4;
+	m68ki_aerr_restore_reg = REG_IR & 7;
+	m68ki_aerr_restore_val = -4;
 	return addr;
 }
 
 static inline uint m68ki_ea_ay_pd_32(void)
 {
 	AY -= 4;
+	/* Pre-decrement is committed before the bus cycle on real 68000;
+	 * it is NOT undone by an address error.  Do NOT set restore. */
 	return AY;
 }
 
@@ -1292,6 +1306,8 @@ static inline uint m68ki_ea_ax_pi_16(void)
 {
 	uint addr = AX;
 	AX += 2;
+	m68ki_aerr_restore_reg = (REG_IR >> 9) & 7;
+	m68ki_aerr_restore_val = -2;
 	return addr;
 }
 
@@ -1299,12 +1315,16 @@ static inline uint m68ki_ea_ax_pi_32(void)
 {
 	uint addr = AX;
 	AX += 4;
+	m68ki_aerr_restore_reg = (REG_IR >> 9) & 7;
+	m68ki_aerr_restore_val = -4;
 	return addr;
 }
 
 static inline uint m68ki_ea_ax_pd_32(void)
 {
 	AX -= 4;
+	/* Pre-decrement is committed before the bus cycle on real 68000;
+	 * it is NOT undone by an address error.  Do NOT set restore. */
 	return AX;
 }
 
