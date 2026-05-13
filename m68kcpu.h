@@ -751,6 +751,12 @@ extern sigjmp_buf m68ki_aerr_trap;
 		m68ki_aerr_address = ADDR; \
 		m68ki_aerr_write_mode = WRITE_MODE; \
 		m68ki_aerr_fc = FC; \
+		/* m68ki_aerr_restore_reg is a register INDEX (0-7), set by the
+		 * instruction handler before calling m68ki_write_*().  If the
+		 * write triggers an address error, we undo the pre-increment
+		 * by adding m68ki_aerr_restore_val back to REG_A[idx].
+		 * SAFETY: _restore_reg must be INDEX, never register VALUE! */ \
+		if(m68ki_aerr_restore_reg != -1) { REG_A[m68ki_aerr_restore_reg] += m68ki_aerr_restore_val; m68ki_aerr_restore_reg = -1; } \
 		siglongjmp(m68ki_aerr_trap, 1); \
 	}
 
@@ -796,11 +802,24 @@ extern jmp_buf m68ki_aerr_trap;
 	/* CPU-type-gated wrapper — only fires on 68000/68010 where
 	 * misaligned word/long accesses are illegal.  The 68020+ handle
 	 * misaligned accesses in hardware, so the check is skipped.
+	 *
+	 * DOUBLE-FAULT PROTECTION: If we are already writing a stack frame
+	 * (RUN_MODE_BERR_AERR_RESET_WSF) and encounter another odd address,
+	 * do NOT fire siglongjmp — that would re-enter the exception handler
+	 * recursively and corrupt the C stack.  Instead, halt the CPU
+	 * immediately (matching real 68000 double-fault behavior).
 	 */
 	#define m68ki_check_address_error_010_less(ADDR, WRITE_MODE, FC) \
 		if (CPU_TYPE_IS_010_LESS(CPU_TYPE)) \
 		{ \
-			m68ki_check_address_error(ADDR, WRITE_MODE, FC) \
+			if(CPU_RUN_MODE == RUN_MODE_BERR_AERR_RESET_WSF) \
+			{ \
+				if((ADDR)&1) CPU_STOPPED = STOP_LEVEL_HALT; \
+			} \
+			else \
+			{ \
+				m68ki_check_address_error(ADDR, WRITE_MODE, FC) \
+			} \
 		}
 
 	/* Check whether the PC just loaded by a branch or return instruction is
@@ -824,11 +843,11 @@ extern jmp_buf m68ki_aerr_trap;
 	 *     FUNCTION_CODE_SUPERVISOR_PROGRAM (6) in supervisor mode and
 	 *     FUNCTION_CODE_USER_PROGRAM (2) in user mode, matching silicon.
 	 */
-	#define m68ki_check_pc_address_error_010_less() \
+	#define m68ki_check_pc_address_error_010_less(ORIGINAL_PC) \
 		if(CPU_TYPE_IS_010_LESS(CPU_TYPE) && (REG_PC & 1)) \
 		{ \
 			uint _odd_pc = REG_PC; \
-			REG_PC -= 2; \
+			m68ki_aerr_pc_offset = ORIGINAL_PC - (REG_PC - 2); \
 			CPU_INSTR_MODE = INSTRUCTION_NO; \
 			m68ki_check_address_error(_odd_pc, MODE_READ, FLAG_S | FUNCTION_CODE_USER_PROGRAM) \
 		}
@@ -838,7 +857,7 @@ extern jmp_buf m68ki_aerr_trap;
 	#define m68ki_set_address_error_trap()
 	#define m68ki_check_address_error(ADDR, WRITE_MODE, FC)
 	#define m68ki_check_address_error_010_less(ADDR, WRITE_MODE, FC)
-	#define m68ki_check_pc_address_error_010_less()
+	#define m68ki_check_pc_address_error_010_less(ORIGINAL_PC)
 #endif /* M68K_ADDRESS_ERROR */
 
 /* Logging */
@@ -870,7 +889,13 @@ extern jmp_buf m68ki_aerr_trap;
 /* Data Register Isolation */
 #define DX (REG_D[(REG_IR >> 9) & 7])
 #define DY (REG_D[REG_IR & 7])
-/* Address Register Isolation */
+/* Address Register Isolation
+ *
+ * IMPORTANT: AX/AY expand to the REGISTER VALUE (e.g. 0x25A73ACB), NOT the
+ * register index (0-7).  They must NEVER be assigned to variables that expect
+ * a register INDEX, such as m68ki_aerr_restore_reg.  For the index, use
+ * (REG_IR >> 9) & 7 (for AX) or REG_IR & 7 (for AY) directly.
+ */
 #define AX (REG_A[(REG_IR >> 9) & 7])
 #define AY (REG_A[REG_IR & 7])
 
@@ -1237,13 +1262,16 @@ extern const uint8    m68ki_ea_idx_cycle_table[];
 extern uint           m68ki_aerr_address;
 extern uint           m68ki_aerr_write_mode;
 extern uint           m68ki_aerr_fc;
+extern uint           m68ki_aerr_pc;
+extern int            m68ki_aerr_pc_offset;
+extern int            m68ki_aerr_restore_reg;  /* REGISTER INDEX (0-7), NOT value! Use (REG_IR>>9)&7 for AX idx, REG_IR&7 for AY idx */
+extern int            m68ki_aerr_restore_val;
 
 /* Effective Address Helpers for 68000/010 Address Error fidelity */
 static inline uint m68ki_ea_ay_pi_16(void)
 {
 	uint addr = AY;
 	AY += 2;
-	m68ki_check_address_error_010_less(addr, MODE_READ, FLAG_S | m68ki_get_address_space());
 	return addr;
 }
 
@@ -1251,14 +1279,12 @@ static inline uint m68ki_ea_ay_pi_32(void)
 {
 	uint addr = AY;
 	AY += 4;
-	m68ki_check_address_error_010_less(addr, MODE_READ, FLAG_S | m68ki_get_address_space());
 	return addr;
 }
 
 static inline uint m68ki_ea_ay_pd_32(void)
 {
 	AY -= 4;
-	m68ki_check_address_error_010_less(AY, MODE_READ, FLAG_S | FUNCTION_CODE_USER_DATA);
 	return AY;
 }
 
@@ -1266,7 +1292,6 @@ static inline uint m68ki_ea_ax_pi_16(void)
 {
 	uint addr = AX;
 	AX += 2;
-	m68ki_check_address_error_010_less(addr, MODE_READ, FLAG_S | m68ki_get_address_space());
 	return addr;
 }
 
@@ -1274,14 +1299,12 @@ static inline uint m68ki_ea_ax_pi_32(void)
 {
 	uint addr = AX;
 	AX += 4;
-	m68ki_check_address_error_010_less(addr, MODE_READ, FLAG_S | m68ki_get_address_space());
 	return addr;
 }
 
 static inline uint m68ki_ea_ax_pd_32(void)
 {
 	AX -= 4;
-	m68ki_check_address_error_010_less(AX, MODE_READ, FLAG_S | FUNCTION_CODE_USER_DATA);
 	return AX;
 }
 

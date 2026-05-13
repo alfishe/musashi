@@ -1757,30 +1757,8 @@ M68KMAKE_OP(addx, 16, mm, .)
 
 M68KMAKE_OP(addx, 32, mm, .)
 {
-	/* Silicon-accurate two-step pre-decrement for both source and destination.
-	 *
-	 * The real MC68000 performs a long-word pre-decrement access as two
-	 * separate word-bus cycles:
-	 *   1. Areg -= 2  (point to high word)  ← address error check HERE
-	 *   2. Areg -= 2  (point to low word)   ← then read/write all 32 bits
-	 *
-	 * If the address after step 1 is odd, the CPU raises an address error
-	 * before step 2, leaving Areg at (original - 2), NOT (original - 4).
-	 * The naive EA_AX_PD_32() / OPER_AY_PD_32() macros atomically subtract 4
-	 * before the alignment check, producing the wrong register value in the
-	 * exception frame.  Both source (Ay) and destination (Ax) must be split.
-	 *
-	 * Verified against Tom Harte SingleStepTests and WinUAE source.
-	 */
-	AY -= 2;
-	m68ki_check_address_error_010_less(AY, MODE_READ, FLAG_S | m68ki_get_address_space());
-	AY -= 2;
-	uint src = m68ki_read_32(AY);
-
-	AX -= 2;
-	m68ki_check_address_error_010_less(AX, MODE_READ, FLAG_S | m68ki_get_address_space());
-	AX -= 2;
-	uint ea  = AX;
+	uint src = OPER_AY_PD_32();
+	uint ea  = EA_AX_PD_32();
 	uint dst = m68ki_read_32(ea);
 	uint res = src + dst + XFLAG_AS_1();
 
@@ -6354,6 +6332,11 @@ M68KMAKE_OP(move, 16, ai, .)
 }
 
 
+/* MOVE post-increment (An)+ destination: before the write we record the
+ * destination register INDEX so that if the write triggers an address error
+ * we can undo the pre-increment.  CRITICAL: use (REG_IR>>9)&7 for the
+ * register INDEX -- never use AX which gives the register VALUE!
+ */
 M68KMAKE_OP(move, 16, pi, d)
 {
 	uint res = MASK_OUT_ABOVE_16(DY);
@@ -6363,7 +6346,10 @@ M68KMAKE_OP(move, 16, pi, d)
 	FLAG_Z = res;
 	FLAG_V = VFLAG_CLEAR;
 	FLAG_C = CFLAG_CLEAR;
+	m68ki_aerr_restore_reg = (REG_IR >> 9) & 7; /* INDEX 0-7, NOT AX value! */
+	m68ki_aerr_restore_val = -2;
 	m68ki_write_16(ea, res);
+	m68ki_aerr_restore_reg = -1;
 
 }
 
@@ -6377,7 +6363,10 @@ M68KMAKE_OP(move, 16, pi, a)
 	FLAG_Z = res;
 	FLAG_V = VFLAG_CLEAR;
 	FLAG_C = CFLAG_CLEAR;
+	m68ki_aerr_restore_reg = (REG_IR >> 9) & 7; /* INDEX 0-7, NOT AX value! */
+	m68ki_aerr_restore_val = -2;
 	m68ki_write_16(ea, res);
+	m68ki_aerr_restore_reg = -1;
 
 }
 
@@ -6391,7 +6380,10 @@ M68KMAKE_OP(move, 16, pi, .)
 	FLAG_Z = res;
 	FLAG_V = VFLAG_CLEAR;
 	FLAG_C = CFLAG_CLEAR;
+	m68ki_aerr_restore_reg = (REG_IR >> 9) & 7; /* INDEX 0-7, NOT AX value! */
+	m68ki_aerr_restore_val = -2;
 	m68ki_write_16(ea, res);
+	m68ki_aerr_restore_reg = -1;
 
 }
 
@@ -6405,7 +6397,9 @@ M68KMAKE_OP(move, 16, pd, d)
 	FLAG_Z = res;
 	FLAG_V = VFLAG_CLEAR;
 	FLAG_C = CFLAG_CLEAR;
+	m68ki_aerr_pc_offset = 2;
 	m68ki_write_16(ea, res);
+	m68ki_aerr_pc_offset = 0;
 
 }
 
@@ -6419,7 +6413,9 @@ M68KMAKE_OP(move, 16, pd, a)
 	FLAG_Z = res;
 	FLAG_V = VFLAG_CLEAR;
 	FLAG_C = CFLAG_CLEAR;
+	m68ki_aerr_pc_offset = 2;
 	m68ki_write_16(ea, res);
+	m68ki_aerr_pc_offset = 0;
 
 }
 
@@ -6433,7 +6429,9 @@ M68KMAKE_OP(move, 16, pd, .)
 	FLAG_Z = res;
 	FLAG_V = VFLAG_CLEAR;
 	FLAG_C = CFLAG_CLEAR;
+	m68ki_aerr_pc_offset = 2;
 	m68ki_write_16(ea, res);
+	m68ki_aerr_pc_offset = 0;
 
 }
 
@@ -6690,6 +6688,7 @@ M68KMAKE_OP(move, 32, ai, .)
 }
 
 
+/* MOVE.L post-increment (An)+ destination -- same INDEX-not-VALUE rule as 16-bit. */
 M68KMAKE_OP(move, 32, pi, d)
 {
 	uint res = DY;
@@ -6699,7 +6698,10 @@ M68KMAKE_OP(move, 32, pi, d)
 	FLAG_Z = res;
 	FLAG_V = VFLAG_CLEAR;
 	FLAG_C = CFLAG_CLEAR;
+	m68ki_aerr_restore_reg = (REG_IR >> 9) & 7; /* INDEX 0-7, NOT AX value! */
+	m68ki_aerr_restore_val = -4;
 	m68ki_write_32(ea, res);
+	m68ki_aerr_restore_reg = -1;
 
 }
 
@@ -6713,7 +6715,10 @@ M68KMAKE_OP(move, 32, pi, a)
 	FLAG_Z = res;
 	FLAG_V = VFLAG_CLEAR;
 	FLAG_C = CFLAG_CLEAR;
+	m68ki_aerr_restore_reg = (REG_IR >> 9) & 7; /* INDEX 0-7, NOT AX value! */
+	m68ki_aerr_restore_val = -4;
 	m68ki_write_32(ea, res);
+	m68ki_aerr_restore_reg = -1;
 
 }
 
@@ -6727,7 +6732,10 @@ M68KMAKE_OP(move, 32, pi, .)
 	FLAG_Z = res;
 	FLAG_V = VFLAG_CLEAR;
 	FLAG_C = CFLAG_CLEAR;
+	m68ki_aerr_restore_reg = (REG_IR >> 9) & 7; /* INDEX 0-7, NOT AX value! */
+	m68ki_aerr_restore_val = -4;
 	m68ki_write_32(ea, res);
+	m68ki_aerr_restore_reg = -1;
 
 }
 
@@ -10701,22 +10709,8 @@ M68KMAKE_OP(subx, 16, mm, .)
 
 M68KMAKE_OP(subx, 32, mm, .)
 {
-	/* Silicon-accurate two-step pre-decrement for both source and destination.
-	 * See addx 32 mm above for the full explanation.
-	 *
-	 * Short version: SUBX.l -(Ay),-(Ax) does each register's decrement in two
-	 * 2-byte steps.  An odd address after the first step raises an address
-	 * error leaving that register at (original - 2), not (original - 4).
-	 */
-	AY -= 2;
-	m68ki_check_address_error_010_less(AY, MODE_READ, FLAG_S | m68ki_get_address_space());
-	AY -= 2;
-	uint src = m68ki_read_32(AY);
-
-	AX -= 2;
-	m68ki_check_address_error_010_less(AX, MODE_READ, FLAG_S | m68ki_get_address_space());
-	AX -= 2;
-	uint ea  = AX;
+	uint src = OPER_AY_PD_32();
+	uint ea  = EA_AX_PD_32();
 	uint dst = m68ki_read_32(ea);
 	uint res = dst - src - XFLAG_AS_1();
 

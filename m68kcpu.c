@@ -94,6 +94,10 @@ jmp_buf m68ki_aerr_trap;
 uint    m68ki_aerr_address;
 uint    m68ki_aerr_write_mode;
 uint    m68ki_aerr_fc;
+uint    m68ki_aerr_pc;
+int     m68ki_aerr_pc_offset = 0;
+int     m68ki_aerr_restore_reg = -1;   /* register INDEX (0-7), NOT value! See AX/AY comment in m68kcpu.h */
+int     m68ki_aerr_restore_val = 0;
 
 jmp_buf m68ki_bus_error_jmp_buf;
 

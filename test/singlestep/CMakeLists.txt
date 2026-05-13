@@ -78,7 +78,20 @@ add_library(musashi_core STATIC
     "${SOFTFLOAT_DIR}/softfloat.c"
 )
 target_include_directories(musashi_core PUBLIC "${MUSASHI_ROOT}")
-target_compile_options(musashi_core PRIVATE -O2 -Wall)
+target_compile_options(musashi_core PRIVATE -Wall)
+
+# ── Optimization MUST be -O2 or higher for correct address error handling ──
+# Musashi's address error emulation uses sigsetjmp/siglongjmp, and the
+# compiler must not reorder or elide the volatile state that the longjmp
+# relies on.  -O2 produces correct code on all tested platforms.
+# -O0 causes subtle timing/stack-frame differences that produce SST failures.
+# Force it here so that cmake -DCMAKE_C_FLAGS="-O0" does not silently break.
+string(REPLACE "-O0" "-O2" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
+if(NOT CMAKE_C_FLAGS MATCHES "-O[1-9]")
+    string(APPEND CMAKE_C_FLAGS " -O2")
+endif()
+message(STATUS "SST C flags (forced -O2+): ${CMAKE_C_FLAGS}")
+
 # Enable address error + prefetch emulation for SST tests — real 68000 has a
 # 2-word prefetch queue and generates address errors on odd-address word/long
 # accesses.  The default m68kconf.h has both OFF for co-simulation use; we
@@ -99,7 +112,7 @@ add_executable(sst_runner
 )
 target_include_directories(sst_runner PRIVATE "${MUSASHI_ROOT}")
 target_link_libraries(sst_runner PRIVATE musashi_core m)
-target_compile_options(sst_runner PRIVATE -O2 -Wall -Wextra)
+target_compile_options(sst_runner PRIVATE -Wall -Wextra)
 # Place binary in test/singlestep/ so it's usable without knowing the build dir
 set_target_properties(sst_runner PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${SST_DIR}"
