@@ -171,6 +171,7 @@ static int run_vector(const sst_vector_t *vec, file_result_t *res, int verbose) 
      * fetch starts in INSTRUCTION_YES mode. */
     CPU_INSTR_MODE = INSTRUCTION_YES;
     m68ki_aerr_restore_reg = -1;
+    m68ki_aerr_pc_offset = 0;
 
     /* Execute one instruction */
     m68k_execute(1);

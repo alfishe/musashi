@@ -1757,8 +1757,21 @@ M68KMAKE_OP(addx, 16, mm, .)
 
 M68KMAKE_OP(addx, 32, mm, .)
 {
-	uint src = OPER_AY_PD_32();
-	uint ea  = EA_AX_PD_32();
+	/* Silicon-accurate two-step predecrement for both source and destination.
+	 * The real MC68000 performs a long-word predecrement as two separate
+	 * word-bus cycles: Areg -= 2 (check odd) then Areg -= 2 (read/write).
+	 * If the address after step 1 is odd, an AERR fires leaving Areg at
+	 * (original - 2), not (original - 4).  Both Ay and Ax must be split.
+	 */
+	AY -= 2;
+	m68ki_check_address_error_010_less(AY, MODE_READ, FLAG_S | m68ki_get_address_space());
+	AY -= 2;
+	uint src = m68ki_read_32(AY);
+
+	AX -= 2;
+	m68ki_check_address_error_010_less(AX, MODE_READ, FLAG_S | m68ki_get_address_space());
+	AX -= 2;
+	uint ea  = AX;
 	uint dst = m68ki_read_32(ea);
 	uint res = src + dst + XFLAG_AS_1();
 
@@ -6571,7 +6584,9 @@ M68KMAKE_OP(move, 16, al, d)
 	FLAG_Z = res;
 	FLAG_V = VFLAG_CLEAR;
 	FLAG_C = CFLAG_CLEAR;
+	m68ki_aerr_pc_offset = -2;
 	m68ki_write_16(ea, res);
+	m68ki_aerr_pc_offset = 0;
 
 }
 
@@ -6585,7 +6600,9 @@ M68KMAKE_OP(move, 16, al, a)
 	FLAG_Z = res;
 	FLAG_V = VFLAG_CLEAR;
 	FLAG_C = CFLAG_CLEAR;
+	m68ki_aerr_pc_offset = -2;
 	m68ki_write_16(ea, res);
+	m68ki_aerr_pc_offset = 0;
 
 }
 
@@ -6599,7 +6616,9 @@ M68KMAKE_OP(move, 16, al, .)
 	FLAG_Z = res;
 	FLAG_V = VFLAG_CLEAR;
 	FLAG_C = CFLAG_CLEAR;
+	m68ki_aerr_pc_offset = -2;
 	m68ki_write_16(ea, res);
+	m68ki_aerr_pc_offset = 0;
 
 }
 
@@ -6749,8 +6768,13 @@ M68KMAKE_OP(move, 32, pd, d)
 	FLAG_Z = res;
 	FLAG_V = VFLAG_CLEAR;
 	FLAG_C = CFLAG_CLEAR;
+	m68ki_aerr_pc_offset = 2;
+	m68ki_aerr_restore_reg = (REG_IR >> 9) & 7; /* INDEX 0-7, NOT AX value! */
+	m68ki_aerr_restore_val = 2; /* on fault: AX = (orig-4)+2 = orig-2 */
 	m68ki_write_16(ea+2, res & 0xFFFF );
 	m68ki_write_16(ea, (res >> 16) & 0xFFFF );
+	m68ki_aerr_restore_reg = -1;
+	m68ki_aerr_pc_offset = 0;
 
 }
 
@@ -6764,8 +6788,13 @@ M68KMAKE_OP(move, 32, pd, a)
 	FLAG_Z = res;
 	FLAG_V = VFLAG_CLEAR;
 	FLAG_C = CFLAG_CLEAR;
+	m68ki_aerr_pc_offset = 2;
+	m68ki_aerr_restore_reg = (REG_IR >> 9) & 7; /* INDEX 0-7, NOT AX value! */
+	m68ki_aerr_restore_val = 2; /* on fault: AX = (orig-4)+2 = orig-2 */
 	m68ki_write_16(ea+2, res & 0xFFFF );
 	m68ki_write_16(ea, (res >> 16) & 0xFFFF );
+	m68ki_aerr_restore_reg = -1;
+	m68ki_aerr_pc_offset = 0;
 
 }
 
@@ -6779,8 +6808,13 @@ M68KMAKE_OP(move, 32, pd, .)
 	FLAG_Z = res;
 	FLAG_V = VFLAG_CLEAR;
 	FLAG_C = CFLAG_CLEAR;
+	m68ki_aerr_pc_offset = 2;
+	m68ki_aerr_restore_reg = (REG_IR >> 9) & 7; /* INDEX 0-7, NOT AX value! */
+	m68ki_aerr_restore_val = 2; /* on fault: AX = (orig-4)+2 = orig-2 */
 	m68ki_write_16(ea+2, res & 0xFFFF );
 	m68ki_write_16(ea, (res >> 16) & 0xFFFF );
+	m68ki_aerr_restore_reg = -1;
+	m68ki_aerr_pc_offset = 0;
 
 }
 
@@ -6948,7 +6982,9 @@ M68KMAKE_OP(move, 32, al, .)
 	FLAG_Z = res;
 	FLAG_V = VFLAG_CLEAR;
 	FLAG_C = CFLAG_CLEAR;
+	m68ki_aerr_pc_offset = -2;
 	m68ki_write_32(ea, res);
+	m68ki_aerr_pc_offset = 0;
 
 }
 
@@ -7039,7 +7075,12 @@ M68KMAKE_OP(move, 16, frs, .)
 	if(CPU_TYPE_IS_000(CPU_TYPE) || FLAG_S)	/* NS990408 */
 	{
 		uint ea = M68KMAKE_GET_EA_AY_16;
-		m68ki_write_16(ea, m68ki_get_sr());
+		/* 68000 silicon quirk: MOVE from SR reports R/W=READ in the
+		 * exception status word even when the write to the EA causes
+		 * the fault.  Must do our own AERR check with MODE_READ instead
+		 * of going through m68ki_write_16 which always uses MODE_WRITE. */
+		m68ki_check_address_error_010_less(ea, MODE_READ, FLAG_S | FUNCTION_CODE_USER_DATA);
+		m68k_write_memory_16(ea, m68ki_get_sr());
 		return;
 	}
 	m68ki_exception_privilege_violation();
@@ -10709,8 +10750,16 @@ M68KMAKE_OP(subx, 16, mm, .)
 
 M68KMAKE_OP(subx, 32, mm, .)
 {
-	uint src = OPER_AY_PD_32();
-	uint ea  = EA_AX_PD_32();
+	/* Silicon-accurate two-step predecrement — see addx 32 mm above. */
+	AY -= 2;
+	m68ki_check_address_error_010_less(AY, MODE_READ, FLAG_S | m68ki_get_address_space());
+	AY -= 2;
+	uint src = m68ki_read_32(AY);
+
+	AX -= 2;
+	m68ki_check_address_error_010_less(AX, MODE_READ, FLAG_S | m68ki_get_address_space());
+	AX -= 2;
+	uint ea  = AX;
 	uint dst = m68ki_read_32(ea);
 	uint res = dst - src - XFLAG_AS_1();
 

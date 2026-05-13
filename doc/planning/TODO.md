@@ -28,6 +28,13 @@ in 6 functions: `m68ki_ea_ay_pi_16`, `m68ki_ea_ay_pi_32`, `m68ki_ea_ay_pd_32`,
 
 ### Address error on odd branch/return targets
 **Fix**: BSR/RTS/RTR/RTE/JMP/Bcc/BRA address error checks.
+**Detailed Code Fix**:
+On a 68000, if a branch target is odd, an Address Error exception is generated. The critical detail is that the PC pushed to the stack MUST NOT be the odd target address. Instead, it must be the PC of the instruction that sequentially follows the branch (the instruction that WOULD have been executed if the branch wasn't taken).
+In Musashi's branch handlers (e.g. `BSR`, `JMP`, `Bcc`), the logic was updating `REG_PC` to the odd target address, and *then* calling `m68ki_check_address_error`, which would push the new, odd `REG_PC` to the stack.
+The fix requires a clean checkout and modifying the branching templates in `m68k_in.c` and exception code in `m68kcpu.h`:
+1.  **Capture Original PC**: Before applying the branch offset, save `REG_PC` (which points to the next instruction).
+2.  **Pass Original PC to Exception Handler**: Introduce a mechanism (like `m68ki_exception_trap_pc`) to push this captured PC to the Address Error stack frame, bypassing the already-modified `REG_PC`.
+3.  **Ensure Instruction Cycle Undos**: If the branch fails, the pipeline cycles must still accurately reflect the Address Error, rather than the taken branch.
 **Result**: All passing 8065/8065.
 
 ### RTE SR-sync fix
@@ -66,7 +73,7 @@ overflow — real silicon preserves them from pre-division state.
 
 ---
 
-## Remaining: MOVE.l / MOVE.w destination EA fault (1,454 failures)
+## 🔴 Explicit TODO: Fix MOVE.l / MOVE.w destination EA fault (1,454 failures)
 
 - MOVE.l (756): Destination (An)+/-(An) address register wrong on write fault
 - MOVE.w (698): Same destination EA fault pattern
@@ -74,8 +81,13 @@ overflow — real silicon preserves them from pre-division state.
 When `MOVE.l src, (An)+` or `MOVE.l src, -(An)` triggers an address error
 on the destination write, the address register reflects the post-increment/
 pre-decrement state when real silicon expects it unchanged (or partially
-updated). Requires restructuring EA computation to defer register update
-past the write.
+updated). 
+
+**Action Plan**:
+1.  **Defer Address Error Trapping**: Currently, Musashi's Effective Address helpers (e.g., `m68ki_ea_ax_pi_32`) evaluate the address, update the register, and trap *immediately* if the address is odd. This prevents the instruction template from knowing it needs to restore the register. We must **remove `m68ki_check_address_error_010_less` from all EA helpers** (`m68ki_ea_ax_pd_32`, etc.). This correctly defers the trap to the actual memory access (`m68ki_write_32` or `m68ki_read_32`).
+2.  **Restore Registers on Fault**: Patch the memory-writing `MOVE` templates (like `M68KMAKE_OP(move, 32, pi, .)`) in `m68k_in.c` to specify an `m68ki_aerr_restore_reg` and `m68ki_aerr_restore_val` right before they call `m68ki_write_32`. If the write traps, the exception handler will undo the pre-decrement/post-increment using these values.
+3.  **Account for Word-Writing Order**: The `MOVE.l 32, pd` template uses two `m68ki_write_16` calls instead of `m68ki_write_32`, writing the low word (`ea+2`) first. We must ensure our patch wraps these writes and restores the register by `+2` (since the 68000 microcode decrements by 2, writes the high word, and traps on the high word).
+4.  **Re-run Full Test Suite**: Execute all `tomharte` tests to confirm these 1,454 failures are resolved without regressing other instructions like `ADD.l`.
 
 ---
 
