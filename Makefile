@@ -31,7 +31,6 @@ m68kcpu.o: $(MUSASHIGENHFILES) m68kfpu.c m68kmmu.h softfloat/softfloat.c softflo
 
 $(MUSASHIGENCFILES) $(MUSASHIGENHFILES): $(MUSASHIGENERATOR)$(EXE)
 	$(EXEPATH)$(MUSASHIGENERATOR)$(EXE)
-	python3 tools/patch_move_al_i.py m68kops.c
 
 $(MUSASHIGENERATOR)$(EXE):  $(MUSASHIGENERATOR).c
 	$(CC) -o  $(MUSASHIGENERATOR)$(EXE)  $(MUSASHIGENERATOR).c

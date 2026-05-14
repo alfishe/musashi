@@ -65,14 +65,9 @@ add_executable(m68kmake EXCLUDE_FROM_ALL "${MUSASHI_ROOT}/m68kmake.c")
 add_custom_command(
     OUTPUT  "${MUSASHI_ROOT}/m68kops.c" "${MUSASHI_ROOT}/m68kops.h"
     COMMAND m68kmake
-    # Post-generation patch: MOVE al_i handlers must NOT have aerr_pc_offset.
-    # Immediate source reads all extension words before the write, so REG_PC
-    # is fully advanced and the default offset is already correct.
-    COMMAND ${Python3_EXECUTABLE} "${TOOLS_DIR}/patch_move_al_i.py"
-            "${MUSASHI_ROOT}/m68kops.c"
     WORKING_DIRECTORY "${MUSASHI_ROOT}"
-    DEPENDS m68kmake "${MUSASHI_ROOT}/m68k_in.c" "${TOOLS_DIR}/patch_move_al_i.py"
-    COMMENT "Generating m68kops.c / m68kops.h (with al_i AERR patch)"
+    DEPENDS m68kmake "${MUSASHI_ROOT}/m68k_in.c"
+    COMMENT "Generating m68kops.c / m68kops.h"
 )
 
 # ── Musashi core static library ───────────────────────────────────────────────

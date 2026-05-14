@@ -119,6 +119,8 @@ static const char g_version[] = "4.60";
 #define ID_OPHANDLER_OPER_AY_8  ID_BASE "_GET_OPER_AY_8"
 #define ID_OPHANDLER_OPER_AY_16 ID_BASE "_GET_OPER_AY_16"
 #define ID_OPHANDLER_OPER_AY_32 ID_BASE "_GET_OPER_AY_32"
+#define ID_OPHANDLER_WRITE_AL_16 ID_BASE "_WRITE_AL_16"
+#define ID_OPHANDLER_WRITE_AL_32 ID_BASE "_WRITE_AL_32"
 #define ID_OPHANDLER_CC         ID_BASE "_CC"
 #define ID_OPHANDLER_NOT_CC     ID_BASE "_NOT_CC"
 
@@ -887,6 +889,17 @@ void generate_opcode_handler(FILE* filep, body_struct* body, replace_struct* rep
 		add_replace_string(replace, ID_OPHANDLER_OPER_AY_16, str);
 		sprintf(str, "OPER_%s_32()", g_ea_info_table[ea_mode].ea_add);
 		add_replace_string(replace, ID_OPHANDLER_OPER_AY_32, str);
+
+		/* MOVE absolute-long destination write: memory-source modes
+		 * need aerr_pc_offset=-2; immediate source does not. */
+		if(ea_mode == EA_MODE_I)
+		{
+			add_replace_string(replace, ID_OPHANDLER_WRITE_AL_16, "m68ki_write_16");
+			add_replace_string(replace, ID_OPHANDLER_WRITE_AL_32, "m68ki_write_32");
+		} else {
+			add_replace_string(replace, ID_OPHANDLER_WRITE_AL_16, "m68ki_write_16_al_dest");
+			add_replace_string(replace, ID_OPHANDLER_WRITE_AL_32, "m68ki_write_32_al_dest");
+		}
 	}
 
 	/* Now write the function body with the selected replace strings */

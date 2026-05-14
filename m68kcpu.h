@@ -1885,7 +1885,29 @@ static inline uint OPER_PCDI_16(void)  {uint ea = EA_PCDI_16();  return m68ki_re
 static inline uint OPER_PCDI_32(void)  {uint ea = EA_PCDI_32();  return m68ki_read_pcrel_32(ea);}
 static inline uint OPER_PCIX_8(void)   {uint ea = EA_PCIX_8();   return m68ki_read_pcrel_8(ea); }
 static inline uint OPER_PCIX_16(void)  {uint ea = EA_PCIX_16();  return m68ki_read_pcrel_16(ea);}
-static inline uint OPER_PCIX_32(void)  {uint ea = EA_PCIX_32();  return m68ki_read_pcrel_32(ea);}
+static inline uint OPER_PCIX_32(void)	{uint ea = EA_PCIX_32();	return m68ki_read_pcrel_32(ea);}
+
+/* Write helpers for MOVE absolute-long destination AERR frames.
+ * On the 68000, MOVE to $NNNNNNNN with a memory-source EA stacks a PC
+ * value that is REG_PC-4 (i.e. offset=-2 on top of the default -2).
+ * For immediate source, REG_PC is already fully advanced past the
+ * immediate data, so the default REG_PC-2 is correct and no offset
+ * is needed.  The m68kmake token M68KMAKE_WRITE_AL_16/32 resolves
+ * to these wrappers for memory-source modes and to plain
+ * m68ki_write_* for immediate source. */
+static inline void m68ki_write_16_al_dest(uint ea, uint val)
+{
+	m68ki_aerr_pc_offset = -2;
+	m68ki_write_16(ea, val);
+	m68ki_aerr_pc_offset = 0;
+}
+
+static inline void m68ki_write_32_al_dest(uint ea, uint val)
+{
+	m68ki_aerr_pc_offset = -2;
+	m68ki_write_32(ea, val);
+	m68ki_aerr_pc_offset = 0;
+}
 
 
 
