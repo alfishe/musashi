@@ -1280,8 +1280,6 @@ static inline uint m68ki_ea_ay_pi_16(void)
 {
 	uint addr = AY;
 	AY += 2;
-	m68ki_aerr_restore_reg = REG_IR & 7;
-	m68ki_aerr_restore_val = -2;
 	return addr;
 }
 
@@ -1289,8 +1287,6 @@ static inline uint m68ki_ea_ay_pi_32(void)
 {
 	uint addr = AY;
 	AY += 4;
-	m68ki_aerr_restore_reg = REG_IR & 7;
-	m68ki_aerr_restore_val = -4;
 	return addr;
 }
 
@@ -1306,8 +1302,6 @@ static inline uint m68ki_ea_ax_pi_16(void)
 {
 	uint addr = AX;
 	AX += 2;
-	m68ki_aerr_restore_reg = (REG_IR >> 9) & 7;
-	m68ki_aerr_restore_val = -2;
 	return addr;
 }
 
@@ -1315,8 +1309,6 @@ static inline uint m68ki_ea_ax_pi_32(void)
 {
 	uint addr = AX;
 	AX += 4;
-	m68ki_aerr_restore_reg = (REG_IR >> 9) & 7;
-	m68ki_aerr_restore_val = -4;
 	return addr;
 }
 
