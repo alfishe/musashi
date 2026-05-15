@@ -18,9 +18,16 @@ sst_test_file_t *sst_load(const char *filepath) {
     FILE *f = fopen(filepath, "rb");
     if (!f) return NULL;
 
-    /* Read magic */
+    /* Read magic — accept both SST1 (no cycles) and SST2 (with cycles) */
     char magic[4];
-    if (fread(magic, 1, 4, f) != 4 || memcmp(magic, "SST1", 4) != 0) {
+    int has_cycles = 0;
+    if (fread(magic, 1, 4, f) != 4) {
+        fclose(f);
+        return NULL;
+    }
+    if (memcmp(magic, "SST2", 4) == 0) {
+        has_cycles = 1;
+    } else if (memcmp(magic, "SST1", 4) != 0) {
         fclose(f);
         return NULL;
     }
@@ -94,6 +101,15 @@ sst_test_file_t *sst_load(const char *filepath) {
                 vec->final_state.ram[j].addr = addr;
                 vec->final_state.ram[j].value = val;
             }
+        }
+
+        /* Expected cycles (SST2 only) */
+        if (has_cycles) {
+            uint16_t cyc;
+            fread(&cyc, 2, 1, f);
+            vec->expected_cycles = cyc;
+        } else {
+            vec->expected_cycles = 0;
         }
     }
 

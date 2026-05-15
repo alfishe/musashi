@@ -95,6 +95,15 @@ typedef struct {
     fail_detail_t first_fails[MAX_FAILS_DETAIL];
     int num_details;
     double elapsed_sec;   /* wall-clock time for this file */
+    /* Cycle verification stats (--cycles) */
+    int cycle_checked;     /* vectors with expected_cycles > 0 */
+    int cycle_match;       /* expected == actual */
+    int cycle_mismatch;    /* expected != actual */
+    int cycle_min_delta;   /* smallest (actual - expected) for mismatches */
+    int cycle_max_delta;   /* largest (actual - expected) for mismatches */
+    char cycle_sample_name[64]; /* name of first cycle mismatch */
+    int cycle_sample_expected;
+    int cycle_sample_actual;
 } file_result_t;
 
 #define MAX_FILE_RESULTS 300
@@ -135,7 +144,8 @@ static int is_blacklisted(uint8_t source_id, const char *mnemonic) {
 /* ------------------------------------------------------------------ */
 /* Run one vector                                                     */
 /* ------------------------------------------------------------------ */
-static int run_vector(const sst_vector_t *vec, file_result_t *res, int verbose) {
+static int run_vector(const sst_vector_t *vec, file_result_t *res,
+                       int verbose, int check_cycles) {
     /* Clear memory */
     memset(g_mem, 0, MEM_SIZE);
 
@@ -174,7 +184,8 @@ static int run_vector(const sst_vector_t *vec, file_result_t *res, int verbose) 
     m68ki_aerr_pc_offset = 0;
 
     /* Execute one instruction */
-    m68k_execute(1);
+    int actual_cycles = m68k_execute(1);
+    (void)actual_cycles;  /* used below if check_cycles */
 
     /* Compare final registers */
     int ok = 1;
@@ -226,6 +237,32 @@ static int run_vector(const sst_vector_t *vec, file_result_t *res, int verbose) 
                     res->num_details++;
                 }
                 break;
+            }
+        }
+    }
+
+    /* ---- Cycle verification ---- */
+    if (check_cycles && vec->expected_cycles > 0) {
+        res->cycle_checked++;
+        if (actual_cycles == (int)vec->expected_cycles) {
+            res->cycle_match++;
+        } else {
+            res->cycle_mismatch++;
+            int delta = actual_cycles - (int)vec->expected_cycles;
+            if (res->cycle_mismatch == 1 || delta < res->cycle_min_delta)
+                res->cycle_min_delta = delta;
+            if (res->cycle_mismatch == 1 || delta > res->cycle_max_delta)
+                res->cycle_max_delta = delta;
+            if (res->cycle_mismatch == 1) {
+                strncpy(res->cycle_sample_name, vec->name,
+                        sizeof(res->cycle_sample_name) - 1);
+                res->cycle_sample_expected = vec->expected_cycles;
+                res->cycle_sample_actual = actual_cycles;
+            }
+            if (verbose && res->cycle_mismatch <= MAX_FAILS_DETAIL) {
+                printf("    CYCLE %s [%s]: exp=%d got=%d (delta=%+d)\n",
+                       vec->name, res->mnemonic,
+                       vec->expected_cycles, actual_cycles, delta);
             }
         }
     }
@@ -309,7 +346,7 @@ static int run_vector(const sst_vector_t *vec, file_result_t *res, int verbose) 
 /* Run one .sst file                                                  */
 /* ------------------------------------------------------------------ */
 static void run_file(const char *filepath, int max_vectors, int verbose,
-                     int stop_on_fail) {
+                     int stop_on_fail, int check_cycles) {
     sst_test_file_t *tf = sst_load(filepath);
     if (!tf) {
         fprintf(stderr, "ERROR: cannot load %s\n", filepath);
@@ -342,7 +379,7 @@ static void run_file(const char *filepath, int max_vectors, int verbose,
 
     double t0 = now_sec();
     for (int i = 0; i < count; i++) {
-        if (run_vector(&tf->vectors[i], res, verbose))
+        if (run_vector(&tf->vectors[i], res, verbose, check_cycles))
             res->passed++;
         else {
             res->failed++;
@@ -353,9 +390,14 @@ static void run_file(const char *filepath, int max_vectors, int verbose,
 
     /* Console progress line */
     const char *status = (res->failed == 0) ? "PASS" : "FAIL";
-    printf("[%-8s] %-20s %5d/%5d %s  (%.3fs)\n",
+    char cycle_tag[32] = "";
+    if (check_cycles && res->cycle_checked > 0) {
+        snprintf(cycle_tag, sizeof(cycle_tag), " cyc=%d/%d",
+                 res->cycle_match, res->cycle_checked);
+    }
+    printf("[%-8s] %-20s %5d/%5d %s%s  (%.3fs)\n",
            res->source, res->mnemonic, res->passed, res->total, status,
-           res->elapsed_sec);
+           cycle_tag, res->elapsed_sec);
 
     sst_free(tf);
 }
@@ -364,7 +406,7 @@ static void run_file(const char *filepath, int max_vectors, int verbose,
 /* Scan directory for .sst files                                      */
 /* ------------------------------------------------------------------ */
 static void scan_dir(const char *dirpath, int max_vectors, int verbose,
-                     int stop_on_fail) {
+                     int stop_on_fail, int check_cycles) {
     DIR *d = opendir(dirpath);
     if (!d) return;
 
@@ -392,7 +434,7 @@ static void scan_dir(const char *dirpath, int max_vectors, int verbose,
             }
 
     for (int i = 0; i < n; i++)
-        run_file(paths[i], max_vectors, verbose, stop_on_fail);
+        run_file(paths[i], max_vectors, verbose, stop_on_fail, check_cycles);
 }
 
 /* ------------------------------------------------------------------ */
@@ -442,7 +484,7 @@ static void compute_timing(timing_stats_t *ts, int total_vectors) {
     if (ts->min_sec > 1e29) ts->min_sec = 0.0;
 }
 
-static void print_summary(void) {
+static void print_summary(int check_cycles) {
     int tf, tp, tfail, tv;
     compute_totals(&tf, &tp, &tfail, &tv);
     int files_pass = 0;
@@ -457,6 +499,35 @@ static void print_summary(void) {
     printf("Vectors: %d/%d passed", tp, tv);
     if (tfail > 0) printf(" (%d FAILED)", tfail);
     printf("\n");
+
+    if (check_cycles) {
+        int total_checked = 0, total_match = 0, total_mismatch = 0;
+        for (int i = 0; i < g_num_results; i++) {
+            total_checked += g_results[i].cycle_checked;
+            total_match += g_results[i].cycle_match;
+            total_mismatch += g_results[i].cycle_mismatch;
+        }
+        printf("\n=== Cycle Verification ===\n");
+        printf("Checked: %d vectors\n", total_checked);
+        printf("Match:   %d (%.1f%%)\n", total_match,
+               total_checked > 0 ? 100.0 * total_match / total_checked : 0.0);
+        printf("Mismatch: %d (%.1f%%)\n", total_mismatch,
+               total_checked > 0 ? 100.0 * total_mismatch / total_checked : 0.0);
+        if (total_mismatch > 0) {
+            printf("\nMismatched instructions:\n");
+            for (int i = 0; i < g_num_results; i++) {
+                if (g_results[i].cycle_mismatch > 0) {
+                    printf("  %-10s %-20s %d/%d mismatch (%s exp=%d got=%d)\n",
+                           g_results[i].source, g_results[i].mnemonic,
+                           g_results[i].cycle_mismatch, g_results[i].cycle_checked,
+                           g_results[i].cycle_sample_name,
+                           g_results[i].cycle_sample_expected,
+                           g_results[i].cycle_sample_actual);
+                }
+            }
+        }
+    }
+
     printf("\n=== Timing ===\n");
     printf("Total wall time : %.3f s\n", ts.wall_sec);
     printf("Throughput      : %.0f vectors/s\n", ts.vecs_per_sec);
@@ -493,6 +564,10 @@ static void write_report_json(const char *path) {
         fprintf(f, "    {\"source\":\"%s\",\"mnemonic\":\"%s\","
                 "\"total\":%d,\"passed\":%d,\"failed\":%d,\"elapsed_sec\":%.4f",
                 r->source, r->mnemonic, r->total, r->passed, r->failed, r->elapsed_sec);
+        if (r->cycle_checked > 0) {
+            fprintf(f, ",\"cycle_checked\":%d,\"cycle_match\":%d,\"cycle_mismatch\":%d",
+                    r->cycle_checked, r->cycle_match, r->cycle_mismatch);
+        }
         if (r->num_details > 0) {
             fprintf(f, ",\"first_failures\":[");
             for (int j = 0; j < r->num_details; j++) {
@@ -666,6 +741,7 @@ static void usage(void) {
            "  --max-vectors=N     Limit per file (smoke testing)\n"
            "  --stop-on-fail      Stop at first failure\n"
            "  --verbose           Print each failure\n"
+           "  --cycles            Verify cycle counts against reference data\n"
            "  --summary           Print summary\n"
            "  --report-json=PATH  Write JSON report\n"
            "  --report-yaml=PATH  Write YAML report\n"
@@ -678,6 +754,7 @@ static void usage(void) {
 
 int main(int argc, char **argv) {
     int do_all = 0, verbose = 0, summary = 0, stop_on_fail = 0;
+    int check_cycles = 0;
     int max_vectors = 0;
     const char *source_filter = NULL;
     const char *data_dir = "test/singlestep/unified";
@@ -692,6 +769,7 @@ int main(int argc, char **argv) {
         else if (strcmp(argv[i], "--verbose") == 0) verbose = 1;
         else if (strcmp(argv[i], "--summary") == 0) summary = 1;
         else if (strcmp(argv[i], "--stop-on-fail") == 0) stop_on_fail = 1;
+        else if (strcmp(argv[i], "--cycles") == 0) check_cycles = 1;
         else if (strncmp(argv[i], "--source=", 9) == 0) source_filter = argv[i] + 9;
         else if (strncmp(argv[i], "--data-dir=", 11) == 0) data_dir = argv[i] + 11;
         else if (strncmp(argv[i], "--max-vectors=", 14) == 0) max_vectors = atoi(argv[i] + 14);
@@ -747,11 +825,11 @@ int main(int argc, char **argv) {
         char path[1024];
         if (do_tomharte) {
             snprintf(path, sizeof(path), "%s/tomharte", data_dir);
-            scan_dir(path, max_vectors, verbose, stop_on_fail);
+            scan_dir(path, max_vectors, verbose, stop_on_fail, check_cycles);
         }
         if (do_raddad) {
             snprintf(path, sizeof(path), "%s/raddad", data_dir);
-            scan_dir(path, max_vectors, verbose, stop_on_fail);
+            scan_dir(path, max_vectors, verbose, stop_on_fail, check_cycles);
         }
     } else {
         /* Resolve each positional arg: accept full path, NAME.sst, or bare NAME.
@@ -762,7 +840,7 @@ int main(int argc, char **argv) {
 
             /* If arg contains a path separator, treat as literal path */
             if (strchr(arg, '/') || strchr(arg, '\\')) {
-                run_file(arg, max_vectors, verbose, stop_on_fail);
+                run_file(arg, max_vectors, verbose, stop_on_fail, check_cycles);
                 continue;
             }
 
@@ -789,7 +867,7 @@ int main(int argc, char **argv) {
                 FILE *fp = fopen(probe, "rb");
                 if (fp) {
                     fclose(fp);
-                    run_file(probe, max_vectors, verbose, stop_on_fail);
+                    run_file(probe, max_vectors, verbose, stop_on_fail, check_cycles);
                     found++;
                 }
             }
@@ -801,7 +879,7 @@ int main(int argc, char **argv) {
 
     g_run_end = now_sec();
 
-    if (summary) print_summary();
+    if (summary) print_summary(check_cycles);
 
     /* ---- Report output ---- */
     /* If no explicit report path was given, auto-generate a timestamped

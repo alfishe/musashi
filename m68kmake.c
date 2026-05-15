@@ -635,8 +635,12 @@ int get_oper_cycles(opcode_struct* op, int ea_mode, int cpu_type)
 				return op->cycles[cpu_type] + g_clr_cycle_table[ea_mode][size];
 		}
 
-		/* ASG: added these cases -- immediate modes take 2 extra cycles here */
-		if(cpu_type == CPU_TYPE_000 && ea_mode == EA_MODE_I &&
+		/* ASG: added these cases -- immediate modes take 2 extra cycles here.
+		 * The +2 applies only to word and long operations, NOT byte.  Real 68000
+		 * byte-immediate ALU operations (ADD/AND/OR/SUB.b #imm,Dn) take 8 cycles
+		 * total (base 4 + EA 4 = 8), with no extra +2.  Word and long variants
+		 * need the +2 to match real hardware (e.g. ADD.w #imm,Dn = 4+4+2=10). */
+		if(cpu_type == CPU_TYPE_000 && ea_mode == EA_MODE_I && op->size != 8 &&
 		   ((strcmp(op->name, "add") == 0 && strcmp(op->spec_proc, "er") == 0) ||
 			strcmp(op->name, "adda")   == 0                                    ||
 			(strcmp(op->name, "and") == 0 && strcmp(op->spec_proc, "er") == 0) ||

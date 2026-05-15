@@ -45,6 +45,7 @@ typedef struct {
     char name[SST_MAX_NAME];
     sst_cpu_state_t initial;
     sst_cpu_state_t final_state;
+    uint16_t expected_cycles;       /* 0 = not available (SST1 format) */
 } sst_vector_t;
 
 typedef struct {

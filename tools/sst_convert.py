@@ -19,8 +19,8 @@ entire pipeline is via the `./test/singlestep/sst_runner.sh` bootstrap script.
 
 Both sources provide single-instruction execution tests for the Motorola 68000.
 Each test vector contains initial CPU state (registers + RAM), and expected
-final state after executing exactly one instruction. Bus cycle traces and
-prefetch data are stripped during conversion (Musashi is not cycle-exact).
+final state after executing exactly one instruction. Bus cycle traces are decoded to extract total clock cycle counts.
+Prefetch data is injected into RAM for the emulator.
 
 IMPORTANT: The .sst output format uses HOST ENDIANNESS for all multi-byte values.
 It is NOT cross-platform portable. If you move vectors between different
@@ -34,7 +34,7 @@ Usage:
 
 Unified SST binary format (.sst):
     Header:
-        char[4]  magic = "SST1"
+        char[4]  magic = "SST2"
         uint32   num_vectors
         uint8    source_id       (0=tomharte, 1=raddad)
         uint8    name_len
@@ -48,6 +48,7 @@ Unified SST binary format (.sst):
         uint16   num_ram_initial
         uint16   num_ram_final
         Per RAM entry: uint32 addr, uint8 value
+        uint16   expected_cycles   (0 = not available)
 """
 
 import os
@@ -59,7 +60,7 @@ import struct
 import argparse
 from pathlib import Path
 
-SST_MAGIC = b'SST1'
+SST_MAGIC = b'SST2'
 SOURCE_TOMHARTE = 0
 SOURCE_RADDAD = 1
 
@@ -104,6 +105,7 @@ def load_tomharte(filepath):
             'initial_ram': initial_ram,
             'final_regs': [fin[r] for r in REG_ORDER],
             'final_ram': [(addr, val) for addr, val in fin.get('ram', [])],
+            'cycles': t.get('length', 0),  # tomharte 'length' = total clock cycles
         })
     return vectors
 
@@ -150,7 +152,8 @@ def _read_raddad_state(content, ptr):
     return ptr, regs, ram
 
 
-def _skip_raddad_transactions(content, ptr):
+def _read_raddad_transactions(content, ptr):
+    """Read transaction block, return (new_ptr, num_cycles)."""
     numbytes, magic = struct.unpack_from('<II', content, ptr)
     assert magic == 0x456789AB
     ptr += 8
@@ -161,7 +164,7 @@ def _skip_raddad_transactions(content, ptr):
         ptr += 5
         if tw != 0:
             ptr += 20
-    return ptr
+    return ptr, num_cycles
 
 
 def load_raddad(filepath):
@@ -188,7 +191,7 @@ def load_raddad(filepath):
         ptr, name = _read_raddad_name(content, ptr)
         ptr, initial_regs, initial_ram = _read_raddad_state(content, ptr)
         ptr, final_regs, final_ram = _read_raddad_state(content, ptr)
-        ptr = _skip_raddad_transactions(content, ptr)
+        ptr, cycles = _read_raddad_transactions(content, ptr)
 
         # Adjust PC: raddad stores m_au (next prefetch addr = insn_start + 4)
         initial_regs[18] = (initial_regs[18] - 4) & 0xFFFFFFFF
@@ -200,6 +203,7 @@ def load_raddad(filepath):
             'initial_ram': initial_ram,
             'final_regs': final_regs,
             'final_ram': final_ram,
+            'cycles': cycles,
         })
     return vectors
 
@@ -239,6 +243,9 @@ def write_sst(outpath, mnemonic, vectors, source_id):
                 f.write(struct.pack('<IB', addr, val & 0xFF))
             for addr, val in vec['final_ram']:
                 f.write(struct.pack('<IB', addr, val & 0xFF))
+
+            # Expected cycle count (uint16, 0 = not available)
+            f.write(struct.pack('<H', vec.get('cycles', 0) & 0xFFFF))
 
 
 # ---------------------------------------------------------------------------
