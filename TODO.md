@@ -99,9 +99,9 @@ Cycle verification infrastructure is live (`sst_runner --cycles`). Current statu
 - [x] **AND.l Dn,Dn base 6→8 + ANDI.l 14→16**: Fixed 676 vectors (2026-05-16)
 - [x] **BCHG/BCLR/BSET.32 bit>=16 +2**: Runtime check for upper word bit ops. Fixed 1,922 vectors (2026-05-16)
 - [~] **DIVU data-dependent cycles (partial)**: Implemented popcount-based formula for normal divisions. Fixed ~500 vectors. Overflow/divzero cases still use worst-case timing. (2026-05-16)
-- [ ] **DIVS data-dependent cycles**: Similar treatment needed for signed division. ~5k vectors.
-- [ ] **CHK remaining non-AERR**: 675 NEG+bound_neg vectors with delta=-2. Needs further investigation.
-- [ ] **ADD.w/SUB.w #imm non-AERR**: 55+52 vectors with exp=8 got=10 (+2 bonus may be wrong for word-immediate ALU)
+- [~] **DIVS data-dependent cycles (partial)**: Same popcount formula applied. Fixed ~107 vectors. (2026-05-16)
+- [ ] **CHK remaining non-AERR**: 675 vectors with delta=-2. Complex: same logical scenario (src<0 && bound<0) has different expected values in different vectors. Needs deeper analysis of tomharte data or 68000 microcode paths.
+- [x] **ADD.w/SUB.w #imm**: Removed incorrect +2 bonus for word-immediate ALU ops. Fixed 107 vectors. (2026-05-16)
 
 #### Remaining (Phase 4 — AERR cycle mechanism)
 - [ ] **AERR per-instruction cycle accounting**: ~131,676 remaining mismatches are all `got=50` because

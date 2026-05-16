@@ -565,8 +565,8 @@ cptrapcc  32  .     .     1111...001111...  ..........  . . U U .   .   .   4   
 dbt       16  .     .     0101000011001...  ..........  U U U U U  12  12   6   6   6
 dbf       16  .     .     0101000111001...  ..........  U U U U U  12  12   6   6   6
 dbcc      16  .     .     0101....11001...  ..........  U U U U U  12  12   6   6   6
-divs      16  .     d     1000...111000...  ..........  U U U U U 158 122  56  56  56
-divs      16  .     .     1000...111......  A+-DXWLdxI  U U U U U 158 122  56  56  56
+divs      16  .     d     1000...111000...  ..........  U U U U U 120 122  56  56  56
+divs      16  .     .     1000...111......  A+-DXWLdxI  U U U U U 120 122  56  56  56
 divu      16  .     d     1000...011000...  ..........  U U U U U 108 108  44  44  44
 divu      16  .     .     1000...011......  A+-DXWLdxI  U U U U U 108 108  44  44  44
 divl      32  .     d     0100110001000...  ..........  . . U U U   .   .  84  84  84
@@ -4733,6 +4733,13 @@ M68KMAKE_OP(divs, 16, ., d)
 
 		if(quotient == MAKE_INT_16(quotient))
 		{
+			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+				uint c = 0;
+				uint q = (quotient < 0) ? -quotient : quotient;
+				for (; q; q >>= 1)
+					if (q & 1) c += 2;
+				USE_CYCLES(c);
+			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
 			FLAG_V = VFLAG_CLEAR;
@@ -4745,11 +4752,11 @@ M68KMAKE_OP(divs, 16, ., d)
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-		FLAG_C = CFLAG_CLEAR;
-		FLAG_V = VFLAG_CLEAR;
-		FLAG_Z = ZFLAG_CLEAR;
-		FLAG_N = NFLAG_CLEAR;
-		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
+	FLAG_C = CFLAG_CLEAR;
+	FLAG_V = VFLAG_CLEAR;
+	FLAG_Z = ZFLAG_CLEAR;
+	FLAG_N = NFLAG_CLEAR;
+	m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
@@ -4777,6 +4784,13 @@ M68KMAKE_OP(divs, 16, ., .)
 
 		if(quotient == MAKE_INT_16(quotient))
 		{
+			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+				uint c = 0;
+				uint q = (quotient < 0) ? -quotient : quotient;
+				for (; q; q >>= 1)
+					if (q & 1) c += 2;
+				USE_CYCLES(c);
+			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
 			FLAG_V = VFLAG_CLEAR;
@@ -4789,11 +4803,11 @@ M68KMAKE_OP(divs, 16, ., .)
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-		FLAG_C = CFLAG_CLEAR;
-		FLAG_V = VFLAG_CLEAR;
-		FLAG_Z = ZFLAG_CLEAR;
-		FLAG_N = NFLAG_CLEAR;
-		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
+	FLAG_C = CFLAG_CLEAR;
+	FLAG_V = VFLAG_CLEAR;
+	FLAG_Z = ZFLAG_CLEAR;
+	FLAG_N = NFLAG_CLEAR;
+	m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
