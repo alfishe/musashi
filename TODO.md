@@ -3,7 +3,7 @@
 ## Current Status
 
 **Correctness: 99.9998%** (1,000,058 / 1,000,060 vectors pass)
-**Cycle accuracy: 86.3%** (863,012 / 1,000,060 vectors match)
+**Cycle accuracy: 86.8%** (868,390 / 1,000,060 vectors match)
 
 ---
 
@@ -15,38 +15,14 @@
 - **Musashi is correct; test vectors are wrong**
 - No fix needed
 
-### 2. Cycle Mismatches (137,048 vectors)
+### 2. Cycle Mismatches (131,670 vectors)
 
 | Category | Count | % | Fix Complexity |
 |----------|------:|--:|----------------|
-| AERR (got=50) | 131,669 | 96.1% | ⭐⭐⭐⭐ Major |
-| DIVS normal | 3,030 | 2.2% | ⭐⭐⭐ Hard |
-| DIVU normal | 2,349 | 1.7% | ⭐⭐⭐ Hard |
+| AERR (got=50) | 131,669 | 99.999% | ⭐⭐⭐⭐ Major |
+| Other | 1 | 0.001% | Edge case |
 
----
-
-## Root Cause Analysis (2026-05-16)
-
-### DIVU/DIVS: Complex Timing Model Mismatch
-
-**Problem:** The 68000 division timing depends on the iterative subtract-shift algorithm,
-not just quotient popcount. Current Musashi model is a simplified approximation.
-
-**Attempted fixes:**
-1. `USE_CYCLES(2 * popcount)` — Original, gives 3644/8065 DIVU, 2974/8065 DIVS
-2. `USE_CYCLES(32 - 2 * popcount)` — Inverted, made things worse
-3. `USE_CYCLES(16 - 2 * popcount)` — Centered, DIVU +95, DIVS -107
-
-**Root cause:** The base cycle values in the table (DIVU=108, DIVS=120) don't match
-the actual 68000 minimum/maximum cycle ranges (DIVU: 76-140, DIVS: 122-158).
-The mismatch means no simple popcount formula can be correct.
-
-**Accurate fix would require:**
-- Changing base cycle values in the instruction table
-- Implementing actual 68000 non-restoring division algorithm timing
-- Per-iteration cycle tracking based on dividend/divisor relationship
-
-**Current best:** Original popcount formula (adds cycles for 1-bits), ~45% cycle accuracy for DIV.
+**DIVU/DIVS: FIXED** — Implemented Jorge Cwik's cycle-accurate division algorithm
 
 ### AERR: Per-Instruction Cycle Tracking
 
@@ -82,3 +58,5 @@ The mismatch means no simple popcount formula can be correct.
 - [x] ADD.w/SUB.w #imm remove +2 bonus
 - [x] DIVU/DIVS overflow early-exit (10/16 cycles)
 - [x] CHK data-dependent: +2 when src<0 && src<=bound
+- [x] DIVU/DIVS cycle-accurate timing (Jorge Cwik algorithm)
+- [x] DIVS overflow +2 when dividend negative
