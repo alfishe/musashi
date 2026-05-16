@@ -4,8 +4,12 @@
 Achieve 100% architectural and cycle-accuracy parity with the M68000, as verified by the Tom Harte SingleStepTests (SST).
 
 **Cycle accuracy: 86.2%** (862,330 / 1,000,060 vectors match tomharte cycle counts).
-Remaining ~137,730 mismatches are overwhelmingly AERR-related (got=50 fixed cycle value).
-Non-AERR mismatches reduced to 6,054 (from ~13,383).
+
+| Category | Mismatches | % of Total |
+|----------|----------:|----------:|
+| AERR (got=50) | 131,676 | 95.6% |
+| Non-AERR | 6,054 | 4.4% |
+| **Total** | **137,730** | |
 
 ---
 
@@ -87,26 +91,35 @@ Cycle verification infrastructure is live (`sst_runner --cycles`). Current statu
 
 #### Remaining (Phase 6 — root cause analysis 2026-05-16)
 
-**Root cause analysis identified three distinct issues:**
+**Remaining cycle mismatches breakdown (137,730 total):**
 
-| Issue | Vectors | Root Cause | Fix Type |
-|-------|---------|------------|----------|
-| DIVU/DIVS | ~14k | No data-dependent cycles (fixed worst-case). Real 68000: 76-140 cycles for DIVU. | Runtime algorithm |
-| BCHG/BCLR/BSET.32 | ~1.9k | Bit-position dependent: +2 cycles when bit >= 16. | Runtime check |
+| Category | Count | % | Status |
+|----------|------:|--:|--------|
+| AERR (got=50) | 131,676 | 95.6% | Blocked on per-instruction AERR accounting |
+| DIVS normal | 3,030 | 2.2% | Popcount formula imprecise |
+| DIVU normal | 2,349 | 1.7% | Popcount formula imprecise |
+| CHK | 675 | 0.5% | Complex data-dependent timing |
 
-**Priority queue:**
+**Completed fixes:**
 - [x] **AND.l Dn,Dn base 6→8 + ANDI.l 14→16**: Fixed 676 vectors (2026-05-16)
 - [x] **BCHG/BCLR/BSET.32 bit>=16 +2**: Runtime check for upper word bit ops. Fixed 1,922 vectors (2026-05-16)
 - [x] **ADD.w/SUB.w #imm**: Removed incorrect +2 bonus for word-immediate ALU ops. Fixed 107 vectors (2026-05-16)
-- [x] **DIVU data-dependent cycles**: Popcount formula for normal divisions + overflow early-exit (10 cycles base). Fixed 3,644/8,065 cycle matches. (2026-05-16)
-- [x] **DIVS data-dependent cycles**: Same popcount formula + overflow early-exit (16 cycles base). Fixed 2,974/8,065 cycle matches. (2026-05-16)
-- [ ] **CHK remaining non-AERR**: 675 vectors with delta=-2. Complex: same logical scenario (src<0 && bound<0) has different expected values in different vectors. Needs deeper analysis of tomharte data or 68000 microcode paths.
+- [x] **DIVU overflow early-exit**: 10 cycles base instead of 108. Fixed ~1,933 vectors (2026-05-16)
+- [x] **DIVS overflow early-exit**: 16 cycles base instead of 120. Fixed ~1,855 vectors (2026-05-16)
+- [x] **DIVU/DIVS popcount**: Variable cycles based on quotient bit population. Partial fix.
+
+**Remaining non-AERR issues:**
+- [ ] **DIVU/DIVS normal division timing**: 5,379 vectors. Current popcount formula is imprecise.
+  Real 68000 uses iterative subtract-shift algorithm; exact cycle count depends on dividend/divisor
+  relationship, not just quotient popcount. Would need accurate 68000 division microcode emulation.
+- [ ] **CHK data-dependent cycles**: 675 vectors. Same logical scenario (src<0 && bound<0) has
+  different expected values in different vectors. Needs 68000 microcode analysis.
 
 #### Remaining (Phase 4 — AERR cycle mechanism)
-- [ ] **AERR per-instruction cycle accounting**: ~131,676 remaining mismatches are all `got=50` because
-  `CYC_EXCEPTION[EXCEPTION_ADDRESS_ERROR]` is a flat 50 for all instructions. Real hardware
+- [ ] **AERR per-instruction cycle accounting**: 131,676 mismatches (95.6% of total). All show `got=50`
+  because `CYC_EXCEPTION[EXCEPTION_ADDRESS_ERROR]` is a flat 50 for all instructions. Real hardware
   produces different totals (50–62) depending on how much instruction work completed before
-  the exception fires. Needs per-instruction AERR cycle tracking.
+  the exception fires. This is the largest remaining issue but requires significant infrastructure.
 
 ### 4. Testability Infrastructure Improvements
 
