@@ -12855,12 +12855,29 @@ static void m68k_op_divs_16_d(void)
 
 		if(quotient == MAKE_INT_16(quotient))
 		{
+			/* 68000 DIVS: cycle-accurate timing per Jorge Cwik's algorithm */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint c = 0;
-				uint q = (quotient < 0) ? -quotient : quotient;
-				for (; q; q >>= 1)
-					if (q & 1) c += 2;
-				USE_CYCLES(c);
+				sint dividend = MAKE_INT_32(*r_dst);
+				uint mcycles = 6;
+				uint aquot;
+				int i;
+				if (dividend < 0)
+					mcycles++;
+				mcycles += 55;
+				if (src >= 0) {
+					if (dividend >= 0)
+						mcycles--;
+					else
+						mcycles++;
+				}
+				aquot = (dividend < 0) ? -dividend : dividend;
+				aquot /= (src < 0) ? -src : src;
+				for (i = 0; i < 15; i++) {
+					if ((sint16)aquot >= 0)
+						mcycles++;
+					aquot <<= 1;
+				}
+				USE_CYCLES(mcycles * 2 - 120);  /* 120 is table base */
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
@@ -12869,7 +12886,7 @@ static void m68k_op_divs_16_d(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, abort early - only 10 cycles total for Dn source */
+		/* 68000: on overflow, abort early - only 16 cycles total for Dn source */
 		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
 			USE_CYCLES(-104);
 		FLAG_V = VFLAG_SET;
@@ -12908,12 +12925,29 @@ static void m68k_op_divs_16_ai(void)
 
 		if(quotient == MAKE_INT_16(quotient))
 		{
+			/* 68000 DIVS: cycle-accurate timing per Jorge Cwik's algorithm */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint c = 0;
-				uint q = (quotient < 0) ? -quotient : quotient;
-				for (; q; q >>= 1)
-					if (q & 1) c += 2;
-				USE_CYCLES(c);
+				sint dividend = MAKE_INT_32(*r_dst);
+				uint mcycles = 6;
+				uint aquot;
+				int i;
+				if (dividend < 0)
+					mcycles++;
+				mcycles += 55;
+				if (src >= 0) {
+					if (dividend >= 0)
+						mcycles--;
+					else
+						mcycles++;
+				}
+				aquot = (dividend < 0) ? -dividend : dividend;
+				aquot /= (src < 0) ? -src : src;
+				for (i = 0; i < 15; i++) {
+					if ((sint16)aquot >= 0)
+						mcycles++;
+					aquot <<= 1;
+				}
+				USE_CYCLES(mcycles * 2 - 120);  /* 120 is table base */
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
@@ -12922,7 +12956,7 @@ static void m68k_op_divs_16_ai(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		/* 68000: on overflow, abort early - only 16 cycles + EA cycles */
 		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
 			USE_CYCLES(-104);
 		FLAG_V = VFLAG_SET;
@@ -12961,12 +12995,29 @@ static void m68k_op_divs_16_pi(void)
 
 		if(quotient == MAKE_INT_16(quotient))
 		{
+			/* 68000 DIVS: cycle-accurate timing per Jorge Cwik's algorithm */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint c = 0;
-				uint q = (quotient < 0) ? -quotient : quotient;
-				for (; q; q >>= 1)
-					if (q & 1) c += 2;
-				USE_CYCLES(c);
+				sint dividend = MAKE_INT_32(*r_dst);
+				uint mcycles = 6;
+				uint aquot;
+				int i;
+				if (dividend < 0)
+					mcycles++;
+				mcycles += 55;
+				if (src >= 0) {
+					if (dividend >= 0)
+						mcycles--;
+					else
+						mcycles++;
+				}
+				aquot = (dividend < 0) ? -dividend : dividend;
+				aquot /= (src < 0) ? -src : src;
+				for (i = 0; i < 15; i++) {
+					if ((sint16)aquot >= 0)
+						mcycles++;
+					aquot <<= 1;
+				}
+				USE_CYCLES(mcycles * 2 - 120);  /* 120 is table base */
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
@@ -12975,7 +13026,7 @@ static void m68k_op_divs_16_pi(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		/* 68000: on overflow, abort early - only 16 cycles + EA cycles */
 		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
 			USE_CYCLES(-104);
 		FLAG_V = VFLAG_SET;
@@ -13014,12 +13065,29 @@ static void m68k_op_divs_16_pd(void)
 
 		if(quotient == MAKE_INT_16(quotient))
 		{
+			/* 68000 DIVS: cycle-accurate timing per Jorge Cwik's algorithm */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint c = 0;
-				uint q = (quotient < 0) ? -quotient : quotient;
-				for (; q; q >>= 1)
-					if (q & 1) c += 2;
-				USE_CYCLES(c);
+				sint dividend = MAKE_INT_32(*r_dst);
+				uint mcycles = 6;
+				uint aquot;
+				int i;
+				if (dividend < 0)
+					mcycles++;
+				mcycles += 55;
+				if (src >= 0) {
+					if (dividend >= 0)
+						mcycles--;
+					else
+						mcycles++;
+				}
+				aquot = (dividend < 0) ? -dividend : dividend;
+				aquot /= (src < 0) ? -src : src;
+				for (i = 0; i < 15; i++) {
+					if ((sint16)aquot >= 0)
+						mcycles++;
+					aquot <<= 1;
+				}
+				USE_CYCLES(mcycles * 2 - 120);  /* 120 is table base */
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
@@ -13028,7 +13096,7 @@ static void m68k_op_divs_16_pd(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		/* 68000: on overflow, abort early - only 16 cycles + EA cycles */
 		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
 			USE_CYCLES(-104);
 		FLAG_V = VFLAG_SET;
@@ -13067,12 +13135,29 @@ static void m68k_op_divs_16_di(void)
 
 		if(quotient == MAKE_INT_16(quotient))
 		{
+			/* 68000 DIVS: cycle-accurate timing per Jorge Cwik's algorithm */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint c = 0;
-				uint q = (quotient < 0) ? -quotient : quotient;
-				for (; q; q >>= 1)
-					if (q & 1) c += 2;
-				USE_CYCLES(c);
+				sint dividend = MAKE_INT_32(*r_dst);
+				uint mcycles = 6;
+				uint aquot;
+				int i;
+				if (dividend < 0)
+					mcycles++;
+				mcycles += 55;
+				if (src >= 0) {
+					if (dividend >= 0)
+						mcycles--;
+					else
+						mcycles++;
+				}
+				aquot = (dividend < 0) ? -dividend : dividend;
+				aquot /= (src < 0) ? -src : src;
+				for (i = 0; i < 15; i++) {
+					if ((sint16)aquot >= 0)
+						mcycles++;
+					aquot <<= 1;
+				}
+				USE_CYCLES(mcycles * 2 - 120);  /* 120 is table base */
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
@@ -13081,7 +13166,7 @@ static void m68k_op_divs_16_di(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		/* 68000: on overflow, abort early - only 16 cycles + EA cycles */
 		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
 			USE_CYCLES(-104);
 		FLAG_V = VFLAG_SET;
@@ -13120,12 +13205,29 @@ static void m68k_op_divs_16_ix(void)
 
 		if(quotient == MAKE_INT_16(quotient))
 		{
+			/* 68000 DIVS: cycle-accurate timing per Jorge Cwik's algorithm */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint c = 0;
-				uint q = (quotient < 0) ? -quotient : quotient;
-				for (; q; q >>= 1)
-					if (q & 1) c += 2;
-				USE_CYCLES(c);
+				sint dividend = MAKE_INT_32(*r_dst);
+				uint mcycles = 6;
+				uint aquot;
+				int i;
+				if (dividend < 0)
+					mcycles++;
+				mcycles += 55;
+				if (src >= 0) {
+					if (dividend >= 0)
+						mcycles--;
+					else
+						mcycles++;
+				}
+				aquot = (dividend < 0) ? -dividend : dividend;
+				aquot /= (src < 0) ? -src : src;
+				for (i = 0; i < 15; i++) {
+					if ((sint16)aquot >= 0)
+						mcycles++;
+					aquot <<= 1;
+				}
+				USE_CYCLES(mcycles * 2 - 120);  /* 120 is table base */
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
@@ -13134,7 +13236,7 @@ static void m68k_op_divs_16_ix(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		/* 68000: on overflow, abort early - only 16 cycles + EA cycles */
 		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
 			USE_CYCLES(-104);
 		FLAG_V = VFLAG_SET;
@@ -13173,12 +13275,29 @@ static void m68k_op_divs_16_aw(void)
 
 		if(quotient == MAKE_INT_16(quotient))
 		{
+			/* 68000 DIVS: cycle-accurate timing per Jorge Cwik's algorithm */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint c = 0;
-				uint q = (quotient < 0) ? -quotient : quotient;
-				for (; q; q >>= 1)
-					if (q & 1) c += 2;
-				USE_CYCLES(c);
+				sint dividend = MAKE_INT_32(*r_dst);
+				uint mcycles = 6;
+				uint aquot;
+				int i;
+				if (dividend < 0)
+					mcycles++;
+				mcycles += 55;
+				if (src >= 0) {
+					if (dividend >= 0)
+						mcycles--;
+					else
+						mcycles++;
+				}
+				aquot = (dividend < 0) ? -dividend : dividend;
+				aquot /= (src < 0) ? -src : src;
+				for (i = 0; i < 15; i++) {
+					if ((sint16)aquot >= 0)
+						mcycles++;
+					aquot <<= 1;
+				}
+				USE_CYCLES(mcycles * 2 - 120);  /* 120 is table base */
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
@@ -13187,7 +13306,7 @@ static void m68k_op_divs_16_aw(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		/* 68000: on overflow, abort early - only 16 cycles + EA cycles */
 		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
 			USE_CYCLES(-104);
 		FLAG_V = VFLAG_SET;
@@ -13226,12 +13345,29 @@ static void m68k_op_divs_16_al(void)
 
 		if(quotient == MAKE_INT_16(quotient))
 		{
+			/* 68000 DIVS: cycle-accurate timing per Jorge Cwik's algorithm */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint c = 0;
-				uint q = (quotient < 0) ? -quotient : quotient;
-				for (; q; q >>= 1)
-					if (q & 1) c += 2;
-				USE_CYCLES(c);
+				sint dividend = MAKE_INT_32(*r_dst);
+				uint mcycles = 6;
+				uint aquot;
+				int i;
+				if (dividend < 0)
+					mcycles++;
+				mcycles += 55;
+				if (src >= 0) {
+					if (dividend >= 0)
+						mcycles--;
+					else
+						mcycles++;
+				}
+				aquot = (dividend < 0) ? -dividend : dividend;
+				aquot /= (src < 0) ? -src : src;
+				for (i = 0; i < 15; i++) {
+					if ((sint16)aquot >= 0)
+						mcycles++;
+					aquot <<= 1;
+				}
+				USE_CYCLES(mcycles * 2 - 120);  /* 120 is table base */
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
@@ -13240,7 +13376,7 @@ static void m68k_op_divs_16_al(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		/* 68000: on overflow, abort early - only 16 cycles + EA cycles */
 		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
 			USE_CYCLES(-104);
 		FLAG_V = VFLAG_SET;
@@ -13279,12 +13415,29 @@ static void m68k_op_divs_16_pcdi(void)
 
 		if(quotient == MAKE_INT_16(quotient))
 		{
+			/* 68000 DIVS: cycle-accurate timing per Jorge Cwik's algorithm */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint c = 0;
-				uint q = (quotient < 0) ? -quotient : quotient;
-				for (; q; q >>= 1)
-					if (q & 1) c += 2;
-				USE_CYCLES(c);
+				sint dividend = MAKE_INT_32(*r_dst);
+				uint mcycles = 6;
+				uint aquot;
+				int i;
+				if (dividend < 0)
+					mcycles++;
+				mcycles += 55;
+				if (src >= 0) {
+					if (dividend >= 0)
+						mcycles--;
+					else
+						mcycles++;
+				}
+				aquot = (dividend < 0) ? -dividend : dividend;
+				aquot /= (src < 0) ? -src : src;
+				for (i = 0; i < 15; i++) {
+					if ((sint16)aquot >= 0)
+						mcycles++;
+					aquot <<= 1;
+				}
+				USE_CYCLES(mcycles * 2 - 120);  /* 120 is table base */
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
@@ -13293,7 +13446,7 @@ static void m68k_op_divs_16_pcdi(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		/* 68000: on overflow, abort early - only 16 cycles + EA cycles */
 		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
 			USE_CYCLES(-104);
 		FLAG_V = VFLAG_SET;
@@ -13332,12 +13485,29 @@ static void m68k_op_divs_16_pcix(void)
 
 		if(quotient == MAKE_INT_16(quotient))
 		{
+			/* 68000 DIVS: cycle-accurate timing per Jorge Cwik's algorithm */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint c = 0;
-				uint q = (quotient < 0) ? -quotient : quotient;
-				for (; q; q >>= 1)
-					if (q & 1) c += 2;
-				USE_CYCLES(c);
+				sint dividend = MAKE_INT_32(*r_dst);
+				uint mcycles = 6;
+				uint aquot;
+				int i;
+				if (dividend < 0)
+					mcycles++;
+				mcycles += 55;
+				if (src >= 0) {
+					if (dividend >= 0)
+						mcycles--;
+					else
+						mcycles++;
+				}
+				aquot = (dividend < 0) ? -dividend : dividend;
+				aquot /= (src < 0) ? -src : src;
+				for (i = 0; i < 15; i++) {
+					if ((sint16)aquot >= 0)
+						mcycles++;
+					aquot <<= 1;
+				}
+				USE_CYCLES(mcycles * 2 - 120);  /* 120 is table base */
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
@@ -13346,7 +13516,7 @@ static void m68k_op_divs_16_pcix(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		/* 68000: on overflow, abort early - only 16 cycles + EA cycles */
 		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
 			USE_CYCLES(-104);
 		FLAG_V = VFLAG_SET;
@@ -13385,12 +13555,29 @@ static void m68k_op_divs_16_i(void)
 
 		if(quotient == MAKE_INT_16(quotient))
 		{
+			/* 68000 DIVS: cycle-accurate timing per Jorge Cwik's algorithm */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint c = 0;
-				uint q = (quotient < 0) ? -quotient : quotient;
-				for (; q; q >>= 1)
-					if (q & 1) c += 2;
-				USE_CYCLES(c);
+				sint dividend = MAKE_INT_32(*r_dst);
+				uint mcycles = 6;
+				uint aquot;
+				int i;
+				if (dividend < 0)
+					mcycles++;
+				mcycles += 55;
+				if (src >= 0) {
+					if (dividend >= 0)
+						mcycles--;
+					else
+						mcycles++;
+				}
+				aquot = (dividend < 0) ? -dividend : dividend;
+				aquot /= (src < 0) ? -src : src;
+				for (i = 0; i < 15; i++) {
+					if ((sint16)aquot >= 0)
+						mcycles++;
+					aquot <<= 1;
+				}
+				USE_CYCLES(mcycles * 2 - 120);  /* 120 is table base */
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
@@ -13399,7 +13586,7 @@ static void m68k_op_divs_16_i(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		/* 68000: on overflow, abort early - only 16 cycles + EA cycles */
 		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
 			USE_CYCLES(-104);
 		FLAG_V = VFLAG_SET;
@@ -13426,11 +13613,26 @@ static void m68k_op_divu_16_d(void)
 
 		if(quotient < 0x10000)
 		{
+			/* 68000 DIVU: cycle-accurate timing per Jorge Cwik's algorithm */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint c = 0;
-				for (uint q = quotient; q; q >>= 1)
-					if (q & 1) c += 2;
-				USE_CYCLES(c);
+				uint mcycles = 38;
+				uint hdivisor = src << 16;
+				uint dividend_copy = *r_dst;
+				int i;
+				for (i = 0; i < 15; i++) {
+					uint temp = dividend_copy;
+					dividend_copy <<= 1;
+					if ((sint)temp < 0) {
+						dividend_copy -= hdivisor;
+					} else {
+						mcycles += 2;
+						if (dividend_copy >= hdivisor) {
+							dividend_copy -= hdivisor;
+							mcycles--;
+						}
+					}
+				}
+				USE_CYCLES(mcycles * 2 - 108);  /* 108 is table base */
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
@@ -13466,11 +13668,26 @@ static void m68k_op_divu_16_ai(void)
 
 		if(quotient < 0x10000)
 		{
+			/* 68000 DIVU: cycle-accurate timing per Jorge Cwik's algorithm */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint c = 0;
-				for (uint q = quotient; q; q >>= 1)
-					if (q & 1) c += 2;
-				USE_CYCLES(c);
+				uint mcycles = 38;
+				uint hdivisor = src << 16;
+				uint dividend_copy = *r_dst;
+				int i;
+				for (i = 0; i < 15; i++) {
+					uint temp = dividend_copy;
+					dividend_copy <<= 1;
+					if ((sint)temp < 0) {
+						dividend_copy -= hdivisor;
+					} else {
+						mcycles += 2;
+						if (dividend_copy >= hdivisor) {
+							dividend_copy -= hdivisor;
+							mcycles--;
+						}
+					}
+				}
+				USE_CYCLES(mcycles * 2 - 108);  /* 108 is table base */
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
@@ -13506,11 +13723,26 @@ static void m68k_op_divu_16_pi(void)
 
 		if(quotient < 0x10000)
 		{
+			/* 68000 DIVU: cycle-accurate timing per Jorge Cwik's algorithm */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint c = 0;
-				for (uint q = quotient; q; q >>= 1)
-					if (q & 1) c += 2;
-				USE_CYCLES(c);
+				uint mcycles = 38;
+				uint hdivisor = src << 16;
+				uint dividend_copy = *r_dst;
+				int i;
+				for (i = 0; i < 15; i++) {
+					uint temp = dividend_copy;
+					dividend_copy <<= 1;
+					if ((sint)temp < 0) {
+						dividend_copy -= hdivisor;
+					} else {
+						mcycles += 2;
+						if (dividend_copy >= hdivisor) {
+							dividend_copy -= hdivisor;
+							mcycles--;
+						}
+					}
+				}
+				USE_CYCLES(mcycles * 2 - 108);  /* 108 is table base */
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
@@ -13546,11 +13778,26 @@ static void m68k_op_divu_16_pd(void)
 
 		if(quotient < 0x10000)
 		{
+			/* 68000 DIVU: cycle-accurate timing per Jorge Cwik's algorithm */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint c = 0;
-				for (uint q = quotient; q; q >>= 1)
-					if (q & 1) c += 2;
-				USE_CYCLES(c);
+				uint mcycles = 38;
+				uint hdivisor = src << 16;
+				uint dividend_copy = *r_dst;
+				int i;
+				for (i = 0; i < 15; i++) {
+					uint temp = dividend_copy;
+					dividend_copy <<= 1;
+					if ((sint)temp < 0) {
+						dividend_copy -= hdivisor;
+					} else {
+						mcycles += 2;
+						if (dividend_copy >= hdivisor) {
+							dividend_copy -= hdivisor;
+							mcycles--;
+						}
+					}
+				}
+				USE_CYCLES(mcycles * 2 - 108);  /* 108 is table base */
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
@@ -13586,11 +13833,26 @@ static void m68k_op_divu_16_di(void)
 
 		if(quotient < 0x10000)
 		{
+			/* 68000 DIVU: cycle-accurate timing per Jorge Cwik's algorithm */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint c = 0;
-				for (uint q = quotient; q; q >>= 1)
-					if (q & 1) c += 2;
-				USE_CYCLES(c);
+				uint mcycles = 38;
+				uint hdivisor = src << 16;
+				uint dividend_copy = *r_dst;
+				int i;
+				for (i = 0; i < 15; i++) {
+					uint temp = dividend_copy;
+					dividend_copy <<= 1;
+					if ((sint)temp < 0) {
+						dividend_copy -= hdivisor;
+					} else {
+						mcycles += 2;
+						if (dividend_copy >= hdivisor) {
+							dividend_copy -= hdivisor;
+							mcycles--;
+						}
+					}
+				}
+				USE_CYCLES(mcycles * 2 - 108);  /* 108 is table base */
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
@@ -13626,11 +13888,26 @@ static void m68k_op_divu_16_ix(void)
 
 		if(quotient < 0x10000)
 		{
+			/* 68000 DIVU: cycle-accurate timing per Jorge Cwik's algorithm */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint c = 0;
-				for (uint q = quotient; q; q >>= 1)
-					if (q & 1) c += 2;
-				USE_CYCLES(c);
+				uint mcycles = 38;
+				uint hdivisor = src << 16;
+				uint dividend_copy = *r_dst;
+				int i;
+				for (i = 0; i < 15; i++) {
+					uint temp = dividend_copy;
+					dividend_copy <<= 1;
+					if ((sint)temp < 0) {
+						dividend_copy -= hdivisor;
+					} else {
+						mcycles += 2;
+						if (dividend_copy >= hdivisor) {
+							dividend_copy -= hdivisor;
+							mcycles--;
+						}
+					}
+				}
+				USE_CYCLES(mcycles * 2 - 108);  /* 108 is table base */
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
@@ -13666,11 +13943,26 @@ static void m68k_op_divu_16_aw(void)
 
 		if(quotient < 0x10000)
 		{
+			/* 68000 DIVU: cycle-accurate timing per Jorge Cwik's algorithm */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint c = 0;
-				for (uint q = quotient; q; q >>= 1)
-					if (q & 1) c += 2;
-				USE_CYCLES(c);
+				uint mcycles = 38;
+				uint hdivisor = src << 16;
+				uint dividend_copy = *r_dst;
+				int i;
+				for (i = 0; i < 15; i++) {
+					uint temp = dividend_copy;
+					dividend_copy <<= 1;
+					if ((sint)temp < 0) {
+						dividend_copy -= hdivisor;
+					} else {
+						mcycles += 2;
+						if (dividend_copy >= hdivisor) {
+							dividend_copy -= hdivisor;
+							mcycles--;
+						}
+					}
+				}
+				USE_CYCLES(mcycles * 2 - 108);  /* 108 is table base */
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
@@ -13706,11 +13998,26 @@ static void m68k_op_divu_16_al(void)
 
 		if(quotient < 0x10000)
 		{
+			/* 68000 DIVU: cycle-accurate timing per Jorge Cwik's algorithm */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint c = 0;
-				for (uint q = quotient; q; q >>= 1)
-					if (q & 1) c += 2;
-				USE_CYCLES(c);
+				uint mcycles = 38;
+				uint hdivisor = src << 16;
+				uint dividend_copy = *r_dst;
+				int i;
+				for (i = 0; i < 15; i++) {
+					uint temp = dividend_copy;
+					dividend_copy <<= 1;
+					if ((sint)temp < 0) {
+						dividend_copy -= hdivisor;
+					} else {
+						mcycles += 2;
+						if (dividend_copy >= hdivisor) {
+							dividend_copy -= hdivisor;
+							mcycles--;
+						}
+					}
+				}
+				USE_CYCLES(mcycles * 2 - 108);  /* 108 is table base */
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
@@ -13746,11 +14053,26 @@ static void m68k_op_divu_16_pcdi(void)
 
 		if(quotient < 0x10000)
 		{
+			/* 68000 DIVU: cycle-accurate timing per Jorge Cwik's algorithm */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint c = 0;
-				for (uint q = quotient; q; q >>= 1)
-					if (q & 1) c += 2;
-				USE_CYCLES(c);
+				uint mcycles = 38;
+				uint hdivisor = src << 16;
+				uint dividend_copy = *r_dst;
+				int i;
+				for (i = 0; i < 15; i++) {
+					uint temp = dividend_copy;
+					dividend_copy <<= 1;
+					if ((sint)temp < 0) {
+						dividend_copy -= hdivisor;
+					} else {
+						mcycles += 2;
+						if (dividend_copy >= hdivisor) {
+							dividend_copy -= hdivisor;
+							mcycles--;
+						}
+					}
+				}
+				USE_CYCLES(mcycles * 2 - 108);  /* 108 is table base */
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
@@ -13786,11 +14108,26 @@ static void m68k_op_divu_16_pcix(void)
 
 		if(quotient < 0x10000)
 		{
+			/* 68000 DIVU: cycle-accurate timing per Jorge Cwik's algorithm */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint c = 0;
-				for (uint q = quotient; q; q >>= 1)
-					if (q & 1) c += 2;
-				USE_CYCLES(c);
+				uint mcycles = 38;
+				uint hdivisor = src << 16;
+				uint dividend_copy = *r_dst;
+				int i;
+				for (i = 0; i < 15; i++) {
+					uint temp = dividend_copy;
+					dividend_copy <<= 1;
+					if ((sint)temp < 0) {
+						dividend_copy -= hdivisor;
+					} else {
+						mcycles += 2;
+						if (dividend_copy >= hdivisor) {
+							dividend_copy -= hdivisor;
+							mcycles--;
+						}
+					}
+				}
+				USE_CYCLES(mcycles * 2 - 108);  /* 108 is table base */
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
@@ -13826,11 +14163,26 @@ static void m68k_op_divu_16_i(void)
 
 		if(quotient < 0x10000)
 		{
+			/* 68000 DIVU: cycle-accurate timing per Jorge Cwik's algorithm */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint c = 0;
-				for (uint q = quotient; q; q >>= 1)
-					if (q & 1) c += 2;
-				USE_CYCLES(c);
+				uint mcycles = 38;
+				uint hdivisor = src << 16;
+				uint dividend_copy = *r_dst;
+				int i;
+				for (i = 0; i < 15; i++) {
+					uint temp = dividend_copy;
+					dividend_copy <<= 1;
+					if ((sint)temp < 0) {
+						dividend_copy -= hdivisor;
+					} else {
+						mcycles += 2;
+						if (dividend_copy >= hdivisor) {
+							dividend_copy -= hdivisor;
+							mcycles--;
+						}
+					}
+				}
+				USE_CYCLES(mcycles * 2 - 108);  /* 108 is table base */
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);

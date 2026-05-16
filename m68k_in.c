@@ -4731,13 +4731,29 @@ M68KMAKE_OP(divs, 16, ., d)
 
 		if(quotient == MAKE_INT_16(quotient))
 		{
-			/* 68000 DIVS: data-dependent timing. Approximate with popcount. */
+			/* 68000 DIVS: cycle-accurate timing per Jorge Cwik's algorithm */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint ones = 0;
-				uint q = (quotient < 0) ? -quotient : quotient;
-				for (; q; q >>= 1)
-					if (q & 1) ones++;
-				USE_CYCLES(2 * ones);
+				sint dividend = MAKE_INT_32(*r_dst);
+				uint mcycles = 6;
+				uint aquot;
+				int i;
+				if (dividend < 0)
+					mcycles++;
+				mcycles += 55;
+				if (src >= 0) {
+					if (dividend >= 0)
+						mcycles--;
+					else
+						mcycles++;
+				}
+				aquot = (dividend < 0) ? -dividend : dividend;
+				aquot /= (src < 0) ? -src : src;
+				for (i = 0; i < 15; i++) {
+					if ((sint16)aquot >= 0)
+						mcycles++;
+					aquot <<= 1;
+				}
+				USE_CYCLES(mcycles * 2 - 120);  /* 120 is table base */
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
@@ -4785,13 +4801,29 @@ M68KMAKE_OP(divs, 16, ., .)
 
 		if(quotient == MAKE_INT_16(quotient))
 		{
-			/* 68000 DIVS: data-dependent timing. Approximate with popcount. */
+			/* 68000 DIVS: cycle-accurate timing per Jorge Cwik's algorithm */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint ones = 0;
-				uint q = (quotient < 0) ? -quotient : quotient;
-				for (; q; q >>= 1)
-					if (q & 1) ones++;
-				USE_CYCLES(2 * ones);
+				sint dividend = MAKE_INT_32(*r_dst);
+				uint mcycles = 6;
+				uint aquot;
+				int i;
+				if (dividend < 0)
+					mcycles++;
+				mcycles += 55;
+				if (src >= 0) {
+					if (dividend >= 0)
+						mcycles--;
+					else
+						mcycles++;
+				}
+				aquot = (dividend < 0) ? -dividend : dividend;
+				aquot /= (src < 0) ? -src : src;
+				for (i = 0; i < 15; i++) {
+					if ((sint16)aquot >= 0)
+						mcycles++;
+					aquot <<= 1;
+				}
+				USE_CYCLES(mcycles * 2 - 120);  /* 120 is table base */
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
@@ -4827,12 +4859,26 @@ M68KMAKE_OP(divu, 16, ., d)
 
 		if(quotient < 0x10000)
 		{
-			/* 68000 DIVU: data-dependent timing. Approximate with popcount. */
+			/* 68000 DIVU: cycle-accurate timing per Jorge Cwik's algorithm */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint ones = 0;
-				for (uint q = quotient; q; q >>= 1)
-					if (q & 1) ones++;
-				USE_CYCLES(2 * ones);
+				uint mcycles = 38;
+				uint hdivisor = src << 16;
+				uint dividend_copy = *r_dst;
+				int i;
+				for (i = 0; i < 15; i++) {
+					uint temp = dividend_copy;
+					dividend_copy <<= 1;
+					if ((sint)temp < 0) {
+						dividend_copy -= hdivisor;
+					} else {
+						mcycles += 2;
+						if (dividend_copy >= hdivisor) {
+							dividend_copy -= hdivisor;
+							mcycles--;
+						}
+					}
+				}
+				USE_CYCLES(mcycles * 2 - 108);  /* 108 is table base */
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
@@ -4868,12 +4914,26 @@ M68KMAKE_OP(divu, 16, ., .)
 
 		if(quotient < 0x10000)
 		{
-			/* 68000 DIVU: data-dependent timing. Approximate with popcount. */
+			/* 68000 DIVU: cycle-accurate timing per Jorge Cwik's algorithm */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint ones = 0;
-				for (uint q = quotient; q; q >>= 1)
-					if (q & 1) ones++;
-				USE_CYCLES(2 * ones);
+				uint mcycles = 38;
+				uint hdivisor = src << 16;
+				uint dividend_copy = *r_dst;
+				int i;
+				for (i = 0; i < 15; i++) {
+					uint temp = dividend_copy;
+					dividend_copy <<= 1;
+					if ((sint)temp < 0) {
+						dividend_copy -= hdivisor;
+					} else {
+						mcycles += 2;
+						if (dividend_copy >= hdivisor) {
+							dividend_copy -= hdivisor;
+							mcycles--;
+						}
+					}
+				}
+				USE_CYCLES(mcycles * 2 - 108);  /* 108 is table base */
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
