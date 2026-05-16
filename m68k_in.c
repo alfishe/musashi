@@ -4731,12 +4731,13 @@ M68KMAKE_OP(divs, 16, ., d)
 
 		if(quotient == MAKE_INT_16(quotient))
 		{
+			/* 68000 DIVS: data-dependent timing. Approximate with popcount. */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint c = 0;
+				uint ones = 0;
 				uint q = (quotient < 0) ? -quotient : quotient;
 				for (; q; q >>= 1)
-					if (q & 1) c += 2;
-				USE_CYCLES(c);
+					if (q & 1) ones++;
+				USE_CYCLES(2 * ones);
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
@@ -4745,7 +4746,7 @@ M68KMAKE_OP(divs, 16, ., d)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, abort early - only 10 cycles total for Dn source */
+		/* 68000: on overflow, abort early - only 16 cycles total for Dn source */
 		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
 			USE_CYCLES(-104);
 		FLAG_V = VFLAG_SET;
@@ -4784,12 +4785,13 @@ M68KMAKE_OP(divs, 16, ., .)
 
 		if(quotient == MAKE_INT_16(quotient))
 		{
+			/* 68000 DIVS: data-dependent timing. Approximate with popcount. */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint c = 0;
+				uint ones = 0;
 				uint q = (quotient < 0) ? -quotient : quotient;
 				for (; q; q >>= 1)
-					if (q & 1) c += 2;
-				USE_CYCLES(c);
+					if (q & 1) ones++;
+				USE_CYCLES(2 * ones);
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
@@ -4798,7 +4800,7 @@ M68KMAKE_OP(divs, 16, ., .)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		/* 68000: on overflow, abort early - only 16 cycles + EA cycles */
 		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
 			USE_CYCLES(-104);
 		FLAG_V = VFLAG_SET;
@@ -4825,11 +4827,12 @@ M68KMAKE_OP(divu, 16, ., d)
 
 		if(quotient < 0x10000)
 		{
+			/* 68000 DIVU: data-dependent timing. Approximate with popcount. */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint c = 0;
+				uint ones = 0;
 				for (uint q = quotient; q; q >>= 1)
-					if (q & 1) c += 2;
-				USE_CYCLES(c);
+					if (q & 1) ones++;
+				USE_CYCLES(2 * ones);
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
@@ -4865,11 +4868,12 @@ M68KMAKE_OP(divu, 16, ., .)
 
 		if(quotient < 0x10000)
 		{
+			/* 68000 DIVU: data-dependent timing. Approximate with popcount. */
 			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
-				uint c = 0;
+				uint ones = 0;
 				for (uint q = quotient; q; q >>= 1)
-					if (q & 1) c += 2;
-				USE_CYCLES(c);
+					if (q & 1) ones++;
+				USE_CYCLES(2 * ones);
 			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
