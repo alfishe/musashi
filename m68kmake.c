@@ -639,14 +639,18 @@ int get_oper_cycles(opcode_struct* op, int ea_mode, int cpu_type)
 		 * The +2 applies only to word and long operations, NOT byte.  Real 68000
 		 * byte-immediate ALU operations (ADD/AND/OR/SUB.b #imm,Dn) take 8 cycles
 		 * total (base 4 + EA 4 = 8), with no extra +2.  Word and long variants
-		 * need the +2 to match real hardware (e.g. ADD.w #imm,Dn = 4+4+2=10). */
+		 * need the +2 to match real hardware (e.g. ADD.w #imm,Dn = 4+4+2=10).
+		 *
+		 * Exception: ADDA/SUBA.w #imm do NOT get the +2. Only the .l variants
+		 * have the extra internal cycle (ADDA.l #imm = 6+8+2=16, but
+		 * ADDA.w #imm = 8+4=12). Verified against tomharte SST. */
 		if(cpu_type == CPU_TYPE_000 && ea_mode == EA_MODE_I && op->size != 8 &&
 		   ((strcmp(op->name, "add") == 0 && strcmp(op->spec_proc, "er") == 0) ||
-			strcmp(op->name, "adda")   == 0                                    ||
+			(strcmp(op->name, "adda") == 0 && op->size == 32)              ||
 			(strcmp(op->name, "and") == 0 && strcmp(op->spec_proc, "er") == 0) ||
 			(strcmp(op->name, "or") == 0 && strcmp(op->spec_proc, "er") == 0)  ||
 			(strcmp(op->name, "sub") == 0 && strcmp(op->spec_proc, "er") == 0) ||
-			strcmp(op->name, "suba")   == 0))
+			(strcmp(op->name, "suba") == 0 && op->size == 32)))
 			return op->cycles[cpu_type] + g_ea_cycle_table[ea_mode][cpu_type][size] + 2;
 
 		/* BTST Dn, #imm on 68000 takes 10 cycles (base 4 + EA 4 + 2 internal).
