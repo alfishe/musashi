@@ -3,13 +3,13 @@
 ## 🎯 Current Objective
 Achieve 100% architectural and cycle-accuracy parity with the M68000, as verified by the Tom Harte SingleStepTests (SST).
 
-**Cycle accuracy: 86.2%** (862,330 / 1,000,060 vectors match tomharte cycle counts).
+**Cycle accuracy: 86.3%** (863,012 / 1,000,060 vectors match tomharte cycle counts).
 
 | Category | Mismatches | % of Total |
 |----------|----------:|----------:|
-| AERR (got=50) | 131,676 | 95.6% |
-| Non-AERR | 6,054 | 4.4% |
-| **Total** | **137,730** | |
+| AERR (got=50) | 131,676 | 96.1% |
+| Non-AERR | 5,372 | 3.9% |
+| **Total** | **137,048** | |
 
 ---
 
@@ -95,10 +95,9 @@ Cycle verification infrastructure is live (`sst_runner --cycles`). Current statu
 
 | Category | Count | % | Status |
 |----------|------:|--:|--------|
-| AERR (got=50) | 131,676 | 95.6% | Blocked on per-instruction AERR accounting |
+| AERR (got=50) | 131,676 | 96.1% | Blocked on per-instruction AERR accounting |
 | DIVS normal | 3,030 | 2.2% | Popcount formula imprecise |
 | DIVU normal | 2,349 | 1.7% | Popcount formula imprecise |
-| CHK | 675 | 0.5% | Complex data-dependent timing |
 
 **Completed fixes:**
 - [x] **AND.l Dn,Dn base 6→8 + ANDI.l 14→16**: Fixed 676 vectors (2026-05-16)
@@ -112,8 +111,8 @@ Cycle verification infrastructure is live (`sst_runner --cycles`). Current statu
 - [ ] **DIVU/DIVS normal division timing**: 5,379 vectors. Current popcount formula is imprecise.
   Real 68000 uses iterative subtract-shift algorithm; exact cycle count depends on dividend/divisor
   relationship, not just quotient popcount. Would need accurate 68000 division microcode emulation.
-- [ ] **CHK data-dependent cycles**: 675 vectors. Same logical scenario (src<0 && bound<0) has
-  different expected values in different vectors. Needs 68000 microcode analysis.
+- [x] **CHK data-dependent cycles**: Fixed 682 vectors. +2 cycles when src < 0 AND src <= bound
+  (pure underflow), +0 when src > bound (overflow, even if src < 0). (2026-05-16)
 
 #### Remaining (Phase 4 — AERR cycle mechanism)
 - [ ] **AERR per-instruction cycle accounting**: 131,676 mismatches (95.6% of total). All show `got=50`

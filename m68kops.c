@@ -9520,14 +9520,13 @@ static void m68k_op_chk_16_d(void)
 	FLAG_N = (src < 0)<<7;
 
 	/* CHK trap cycle cost on 68000 is data-dependent:
-	 *   src < 0 AND bound >= 0: 30 + CYC_INSTRUCTION total
-	 *   src < 0 AND bound < 0:  28 + CYC_INSTRUCTION total
-	 *   src >= 0 (over-bound):  28 + CYC_INSTRUCTION total
+	 *   src < 0 (underflow):    30 + EA cycles total
+	 *   src > bound (overflow): 28 + EA cycles total
 	 * The standard exception mechanism gives flat CYC_EXCEPTION[6]=40,
 	 * so we adjust the delta before calling m68ki_exception_trap(). */
 	if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
 	{
-		int desired = 28 + ((src < 0 && bound >= 0) ? 2 : 0);
+		int desired = (src < 0 && src <= bound) ? 30 : 28;
 		USE_CYCLES(desired + (int)CYC_INSTRUCTION[REG_IR] - 40);
 	}
 
@@ -9551,14 +9550,13 @@ static void m68k_op_chk_16_ai(void)
 	FLAG_N = (src < 0)<<7;
 
 	/* CHK trap cycle cost on 68000 is data-dependent:
-	 *   src < 0 AND bound >= 0: 30 + CYC_INSTRUCTION total
-	 *   src < 0 AND bound < 0:  28 + CYC_INSTRUCTION total
-	 *   src >= 0 (over-bound):  28 + CYC_INSTRUCTION total
+	 *   src < 0 (underflow):    30 + EA cycles total
+	 *   src > bound (overflow): 28 + EA cycles total
 	 * The standard exception mechanism gives flat CYC_EXCEPTION[6]=40,
 	 * so we adjust the delta before calling m68ki_exception_trap(). */
 	if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
 	{
-		int desired = 28 + ((src < 0 && bound >= 0) ? 2 : 0);
+		int desired = (src < 0 && src <= bound) ? 30 : 28;
 		USE_CYCLES(desired + (int)CYC_INSTRUCTION[REG_IR] - 40);
 	}
 
@@ -9582,14 +9580,13 @@ static void m68k_op_chk_16_pi(void)
 	FLAG_N = (src < 0)<<7;
 
 	/* CHK trap cycle cost on 68000 is data-dependent:
-	 *   src < 0 AND bound >= 0: 30 + CYC_INSTRUCTION total
-	 *   src < 0 AND bound < 0:  28 + CYC_INSTRUCTION total
-	 *   src >= 0 (over-bound):  28 + CYC_INSTRUCTION total
+	 *   src < 0 (underflow):    30 + EA cycles total
+	 *   src > bound (overflow): 28 + EA cycles total
 	 * The standard exception mechanism gives flat CYC_EXCEPTION[6]=40,
 	 * so we adjust the delta before calling m68ki_exception_trap(). */
 	if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
 	{
-		int desired = 28 + ((src < 0 && bound >= 0) ? 2 : 0);
+		int desired = (src < 0 && src <= bound) ? 30 : 28;
 		USE_CYCLES(desired + (int)CYC_INSTRUCTION[REG_IR] - 40);
 	}
 
@@ -9613,14 +9610,13 @@ static void m68k_op_chk_16_pd(void)
 	FLAG_N = (src < 0)<<7;
 
 	/* CHK trap cycle cost on 68000 is data-dependent:
-	 *   src < 0 AND bound >= 0: 30 + CYC_INSTRUCTION total
-	 *   src < 0 AND bound < 0:  28 + CYC_INSTRUCTION total
-	 *   src >= 0 (over-bound):  28 + CYC_INSTRUCTION total
+	 *   src < 0 (underflow):    30 + EA cycles total
+	 *   src > bound (overflow): 28 + EA cycles total
 	 * The standard exception mechanism gives flat CYC_EXCEPTION[6]=40,
 	 * so we adjust the delta before calling m68ki_exception_trap(). */
 	if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
 	{
-		int desired = 28 + ((src < 0 && bound >= 0) ? 2 : 0);
+		int desired = (src < 0 && src <= bound) ? 30 : 28;
 		USE_CYCLES(desired + (int)CYC_INSTRUCTION[REG_IR] - 40);
 	}
 
@@ -9644,14 +9640,13 @@ static void m68k_op_chk_16_di(void)
 	FLAG_N = (src < 0)<<7;
 
 	/* CHK trap cycle cost on 68000 is data-dependent:
-	 *   src < 0 AND bound >= 0: 30 + CYC_INSTRUCTION total
-	 *   src < 0 AND bound < 0:  28 + CYC_INSTRUCTION total
-	 *   src >= 0 (over-bound):  28 + CYC_INSTRUCTION total
+	 *   src < 0 (underflow):    30 + EA cycles total
+	 *   src > bound (overflow): 28 + EA cycles total
 	 * The standard exception mechanism gives flat CYC_EXCEPTION[6]=40,
 	 * so we adjust the delta before calling m68ki_exception_trap(). */
 	if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
 	{
-		int desired = 28 + ((src < 0 && bound >= 0) ? 2 : 0);
+		int desired = (src < 0 && src <= bound) ? 30 : 28;
 		USE_CYCLES(desired + (int)CYC_INSTRUCTION[REG_IR] - 40);
 	}
 
@@ -9675,14 +9670,13 @@ static void m68k_op_chk_16_ix(void)
 	FLAG_N = (src < 0)<<7;
 
 	/* CHK trap cycle cost on 68000 is data-dependent:
-	 *   src < 0 AND bound >= 0: 30 + CYC_INSTRUCTION total
-	 *   src < 0 AND bound < 0:  28 + CYC_INSTRUCTION total
-	 *   src >= 0 (over-bound):  28 + CYC_INSTRUCTION total
+	 *   src < 0 (underflow):    30 + EA cycles total
+	 *   src > bound (overflow): 28 + EA cycles total
 	 * The standard exception mechanism gives flat CYC_EXCEPTION[6]=40,
 	 * so we adjust the delta before calling m68ki_exception_trap(). */
 	if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
 	{
-		int desired = 28 + ((src < 0 && bound >= 0) ? 2 : 0);
+		int desired = (src < 0 && src <= bound) ? 30 : 28;
 		USE_CYCLES(desired + (int)CYC_INSTRUCTION[REG_IR] - 40);
 	}
 
@@ -9706,14 +9700,13 @@ static void m68k_op_chk_16_aw(void)
 	FLAG_N = (src < 0)<<7;
 
 	/* CHK trap cycle cost on 68000 is data-dependent:
-	 *   src < 0 AND bound >= 0: 30 + CYC_INSTRUCTION total
-	 *   src < 0 AND bound < 0:  28 + CYC_INSTRUCTION total
-	 *   src >= 0 (over-bound):  28 + CYC_INSTRUCTION total
+	 *   src < 0 (underflow):    30 + EA cycles total
+	 *   src > bound (overflow): 28 + EA cycles total
 	 * The standard exception mechanism gives flat CYC_EXCEPTION[6]=40,
 	 * so we adjust the delta before calling m68ki_exception_trap(). */
 	if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
 	{
-		int desired = 28 + ((src < 0 && bound >= 0) ? 2 : 0);
+		int desired = (src < 0 && src <= bound) ? 30 : 28;
 		USE_CYCLES(desired + (int)CYC_INSTRUCTION[REG_IR] - 40);
 	}
 
@@ -9737,14 +9730,13 @@ static void m68k_op_chk_16_al(void)
 	FLAG_N = (src < 0)<<7;
 
 	/* CHK trap cycle cost on 68000 is data-dependent:
-	 *   src < 0 AND bound >= 0: 30 + CYC_INSTRUCTION total
-	 *   src < 0 AND bound < 0:  28 + CYC_INSTRUCTION total
-	 *   src >= 0 (over-bound):  28 + CYC_INSTRUCTION total
+	 *   src < 0 (underflow):    30 + EA cycles total
+	 *   src > bound (overflow): 28 + EA cycles total
 	 * The standard exception mechanism gives flat CYC_EXCEPTION[6]=40,
 	 * so we adjust the delta before calling m68ki_exception_trap(). */
 	if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
 	{
-		int desired = 28 + ((src < 0 && bound >= 0) ? 2 : 0);
+		int desired = (src < 0 && src <= bound) ? 30 : 28;
 		USE_CYCLES(desired + (int)CYC_INSTRUCTION[REG_IR] - 40);
 	}
 
@@ -9768,14 +9760,13 @@ static void m68k_op_chk_16_pcdi(void)
 	FLAG_N = (src < 0)<<7;
 
 	/* CHK trap cycle cost on 68000 is data-dependent:
-	 *   src < 0 AND bound >= 0: 30 + CYC_INSTRUCTION total
-	 *   src < 0 AND bound < 0:  28 + CYC_INSTRUCTION total
-	 *   src >= 0 (over-bound):  28 + CYC_INSTRUCTION total
+	 *   src < 0 (underflow):    30 + EA cycles total
+	 *   src > bound (overflow): 28 + EA cycles total
 	 * The standard exception mechanism gives flat CYC_EXCEPTION[6]=40,
 	 * so we adjust the delta before calling m68ki_exception_trap(). */
 	if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
 	{
-		int desired = 28 + ((src < 0 && bound >= 0) ? 2 : 0);
+		int desired = (src < 0 && src <= bound) ? 30 : 28;
 		USE_CYCLES(desired + (int)CYC_INSTRUCTION[REG_IR] - 40);
 	}
 
@@ -9799,14 +9790,13 @@ static void m68k_op_chk_16_pcix(void)
 	FLAG_N = (src < 0)<<7;
 
 	/* CHK trap cycle cost on 68000 is data-dependent:
-	 *   src < 0 AND bound >= 0: 30 + CYC_INSTRUCTION total
-	 *   src < 0 AND bound < 0:  28 + CYC_INSTRUCTION total
-	 *   src >= 0 (over-bound):  28 + CYC_INSTRUCTION total
+	 *   src < 0 (underflow):    30 + EA cycles total
+	 *   src > bound (overflow): 28 + EA cycles total
 	 * The standard exception mechanism gives flat CYC_EXCEPTION[6]=40,
 	 * so we adjust the delta before calling m68ki_exception_trap(). */
 	if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
 	{
-		int desired = 28 + ((src < 0 && bound >= 0) ? 2 : 0);
+		int desired = (src < 0 && src <= bound) ? 30 : 28;
 		USE_CYCLES(desired + (int)CYC_INSTRUCTION[REG_IR] - 40);
 	}
 
@@ -9830,14 +9820,13 @@ static void m68k_op_chk_16_i(void)
 	FLAG_N = (src < 0)<<7;
 
 	/* CHK trap cycle cost on 68000 is data-dependent:
-	 *   src < 0 AND bound >= 0: 30 + CYC_INSTRUCTION total
-	 *   src < 0 AND bound < 0:  28 + CYC_INSTRUCTION total
-	 *   src >= 0 (over-bound):  28 + CYC_INSTRUCTION total
+	 *   src < 0 (underflow):    30 + EA cycles total
+	 *   src > bound (overflow): 28 + EA cycles total
 	 * The standard exception mechanism gives flat CYC_EXCEPTION[6]=40,
 	 * so we adjust the delta before calling m68ki_exception_trap(). */
 	if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
 	{
-		int desired = 28 + ((src < 0 && bound >= 0) ? 2 : 0);
+		int desired = (src < 0 && src <= bound) ? 30 : 28;
 		USE_CYCLES(desired + (int)CYC_INSTRUCTION[REG_IR] - 40);
 	}
 
