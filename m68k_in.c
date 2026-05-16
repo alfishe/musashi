@@ -431,7 +431,7 @@ and        8  er    d     1100...000000...  ..........  U U U U U   4   4   2   
 and        8  er    .     1100...000......  A+-DXWLdxI  U U U U U   4   4   2   2   2
 and       16  er    d     1100...001000...  ..........  U U U U U   4   4   2   2   2
 and       16  er    .     1100...001......  A+-DXWLdxI  U U U U U   4   4   2   2   2
-and       32  er    d     1100...010000...  ..........  U U U U U   6   6   2   2   2
+and       32  er    d     1100...010000...  ..........  U U U U U   8   6   2   2   2
 and       32  er    .     1100...010......  A+-DXWLdxI  U U U U U   6   6   2   2   2
 and        8  re    .     1100...100......  A+-DXWL...  U U U U U   8   8   4   4   4
 and       16  re    .     1100...101......  A+-DXWL...  U U U U U   8   8   4   4   4
@@ -442,7 +442,7 @@ andi       8  .     d     0000001000000...  ..........  U U U U U   8   8   2   
 andi       8  .     .     0000001000......  A+-DXWL...  U U U U U  12  12   4   4   4
 andi      16  .     d     0000001001000...  ..........  U U U U U   8   8   2   2   2
 andi      16  .     .     0000001001......  A+-DXWL...  U U U U U  12  12   4   4   4
-andi      32  .     d     0000001010000...  ..........  U U U U U  14  14   2   2   2
+andi      32  .     d     0000001010000...  ..........  U U U U U  16  14   2   2   2
 andi      32  .     .     0000001010......  A+-DXWL...  U U U U U  20  20   4   4   4
 asr        8  s     .     1110...000000...  ..........  U U U U U   6   6   6   6   6
 asr       16  s     .     1110...001000...  ..........  U U U U U   6   6   6   6   6
@@ -462,11 +462,11 @@ bcc        8  .     .     0110............  ..........  U U U U U  10  10   6   
 bcc       16  .     .     0110....00000000  ..........  U U U U U  10  10   6   6   6
 bcc       32  .     .     0110....11111111  ..........  U U U U U  10  10   6   6   6
 bchg       8  r     .     0000...101......  A+-DXWL...  U U U U U   8   8   4   4   4
-bchg      32  r     d     0000...101000...  ..........  U U U U U   8   8   4   4   4
+bchg      32  r     d     0000...101000...  ..........  U U U U U   6   8   4   4   4
 bchg       8  s     .     0000100001......  A+-DXWL...  U U U U U  12  12   4   4   4
-bchg      32  s     d     0000100001000...  ..........  U U U U U  12  12   4   4   4
+bchg      32  s     d     0000100001000...  ..........  U U U U U  10  12   4   4   4
 bclr       8  r     .     0000...110......  A+-DXWL...  U U U U U   8  10   4   4   4
-bclr      32  r     d     0000...110000...  ..........  U U U U U  10  10   4   4   4
+bclr      32  r     d     0000...110000...  ..........  U U U U U   8  10   4   4   4
 bclr       8  s     .     0000100010......  A+-DXWL...  U U U U U  12  12   4   4   4
 bclr      32  s     d     0000100010000...  ..........  U U U U U  12  14   4   4   4
 bfchg     32  .     d     1110101011000...  ..........  . . U U U   .   .  12  12  12  timing not quite correct
@@ -489,10 +489,10 @@ bkpt       0  .     .     0100100001001...  ..........  . U U U U   .  10  10  1
 bra        8  .     .     01100000........  ..........  U U U U U  10  10  10  10  10
 bra       16  .     .     0110000000000000  ..........  U U U U U  10  10  10  10  10
 bra       32  .     .     0110000011111111  ..........  U U U U U  10  10  10  10  10
-bset      32  r     d     0000...111000...  ..........  U U U U U   8   8   4   4   4
+bset      32  r     d     0000...111000...  ..........  U U U U U   6   8   4   4   4
 bset       8  r     .     0000...111......  A+-DXWL...  U U U U U   8   8   4   4   4
 bset       8  s     .     0000100011......  A+-DXWL...  U U U U U  12  12   4   4   4
-bset      32  s     d     0000100011000...  ..........  U U U U U  12  12   4   4   4
+bset      32  s     d     0000100011000...  ..........  U U U U U  10  12   4   4   4
 bsr        8  .     .     01100001........  ..........  U U U U U  18  18   7   7   7
 bsr       16  .     .     0110000100000000  ..........  U U U U U  18  18   7   7   7
 bsr       32  .     .     0110000111111111  ..........  U U U U U  18  18   7   7   7
@@ -567,8 +567,8 @@ dbf       16  .     .     0101000111001...  ..........  U U U U U  12  12   6   
 dbcc      16  .     .     0101....11001...  ..........  U U U U U  12  12   6   6   6
 divs      16  .     d     1000...111000...  ..........  U U U U U 158 122  56  56  56
 divs      16  .     .     1000...111......  A+-DXWLdxI  U U U U U 158 122  56  56  56
-divu      16  .     d     1000...011000...  ..........  U U U U U 140 108  44  44  44
-divu      16  .     .     1000...011......  A+-DXWLdxI  U U U U U 140 108  44  44  44
+divu      16  .     d     1000...011000...  ..........  U U U U U 108 108  44  44  44
+divu      16  .     .     1000...011......  A+-DXWLdxI  U U U U U 108 108  44  44  44
 divl      32  .     d     0100110001000...  ..........  . . U U U   .   .  84  84  84
 divl      32  .     .     0100110001......  A+-DXWLdxI  . . U U U   .   .  84  84  84
 eor        8  .     d     1011...100000...  ..........  U U U U U   4   4   2   2   2
@@ -2524,7 +2524,11 @@ M68KMAKE_OP(bcc, 32, ., .)
 M68KMAKE_OP(bchg, 32, r, d)
 {
 	uint* r_dst = &DY;
-	uint mask = 1 << (DX & 0x1f);
+	uint bit = DX & 0x1f;
+	uint mask = 1 << bit;
+
+	if(bit >= 16)
+		USE_CYCLES(2);
 
 	FLAG_Z = *r_dst & mask;
 	*r_dst ^= mask;
@@ -2545,7 +2549,11 @@ M68KMAKE_OP(bchg, 8, r, .)
 M68KMAKE_OP(bchg, 32, s, d)
 {
 	uint* r_dst = &DY;
-	uint mask = 1 << (OPER_I_8() & 0x1f);
+	uint bit = OPER_I_8() & 0x1f;
+	uint mask = 1 << bit;
+
+	if(bit >= 16)
+		USE_CYCLES(2);
 
 	FLAG_Z = *r_dst & mask;
 	*r_dst ^= mask;
@@ -2566,7 +2574,11 @@ M68KMAKE_OP(bchg, 8, s, .)
 M68KMAKE_OP(bclr, 32, r, d)
 {
 	uint* r_dst = &DY;
-	uint mask = 1 << (DX & 0x1f);
+	uint bit = DX & 0x1f;
+	uint mask = 1 << bit;
+
+	if(bit >= 16)
+		USE_CYCLES(2);
 
 	FLAG_Z = *r_dst & mask;
 	*r_dst &= ~mask;
@@ -2587,7 +2599,11 @@ M68KMAKE_OP(bclr, 8, r, .)
 M68KMAKE_OP(bclr, 32, s, d)
 {
 	uint* r_dst = &DY;
-	uint mask = 1 << (OPER_I_8() & 0x1f);
+	uint bit = OPER_I_8() & 0x1f;
+	uint mask = 1 << bit;
+
+	if(bit >= 16)
+		USE_CYCLES(2);
 
 	FLAG_Z = *r_dst & mask;
 	*r_dst &= ~mask;
@@ -3310,7 +3326,11 @@ M68KMAKE_OP(bra, 32, ., .)
 M68KMAKE_OP(bset, 32, r, d)
 {
 	uint* r_dst = &DY;
-	uint mask = 1 << (DX & 0x1f);
+	uint bit = DX & 0x1f;
+	uint mask = 1 << bit;
+
+	if(bit >= 16)
+		USE_CYCLES(2);
 
 	FLAG_Z = *r_dst & mask;
 	*r_dst |= mask;
@@ -3331,7 +3351,11 @@ M68KMAKE_OP(bset, 8, r, .)
 M68KMAKE_OP(bset, 32, s, d)
 {
 	uint* r_dst = &DY;
-	uint mask = 1 << (OPER_I_8() & 0x1f);
+	uint bit = OPER_I_8() & 0x1f;
+	uint mask = 1 << bit;
+
+	if(bit >= 16)
+		USE_CYCLES(2);
 
 	FLAG_Z = *r_dst & mask;
 	*r_dst |= mask;
@@ -4785,6 +4809,12 @@ M68KMAKE_OP(divu, 16, ., d)
 
 		if(quotient < 0x10000)
 		{
+			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+				uint c = 0;
+				for (uint q = quotient; q; q >>= 1)
+					if (q & 1) c += 2;
+				USE_CYCLES(c);
+			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
 			FLAG_V = VFLAG_CLEAR;
@@ -4792,16 +4822,18 @@ M68KMAKE_OP(divu, 16, ., d)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
+		/* 68000: on overflow, abort early - only 10 cycles total for Dn source */
+		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(-98);
 		FLAG_V = VFLAG_SET;
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-		FLAG_C = CFLAG_CLEAR;
-		FLAG_V = VFLAG_CLEAR;
-		FLAG_Z = ZFLAG_CLEAR;
-		FLAG_N = NFLAG_CLEAR;
-		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
+	FLAG_C = CFLAG_CLEAR;
+	FLAG_V = VFLAG_CLEAR;
+	FLAG_Z = ZFLAG_CLEAR;
+	FLAG_N = NFLAG_CLEAR;
+	m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
@@ -4817,6 +4849,12 @@ M68KMAKE_OP(divu, 16, ., .)
 
 		if(quotient < 0x10000)
 		{
+			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+				uint c = 0;
+				for (uint q = quotient; q; q >>= 1)
+					if (q & 1) c += 2;
+				USE_CYCLES(c);
+			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
 			FLAG_V = VFLAG_CLEAR;
@@ -4829,11 +4867,11 @@ M68KMAKE_OP(divu, 16, ., .)
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-		FLAG_C = CFLAG_CLEAR;
-		FLAG_V = VFLAG_CLEAR;
-		FLAG_Z = ZFLAG_CLEAR;
-		FLAG_N = NFLAG_CLEAR;
-		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
+	FLAG_C = CFLAG_CLEAR;
+	FLAG_V = VFLAG_CLEAR;
+	FLAG_Z = ZFLAG_CLEAR;
+	FLAG_N = NFLAG_CLEAR;
+	m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
