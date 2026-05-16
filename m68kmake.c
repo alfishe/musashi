@@ -649,6 +649,13 @@ int get_oper_cycles(opcode_struct* op, int ea_mode, int cpu_type)
 			strcmp(op->name, "suba")   == 0))
 			return op->cycles[cpu_type] + g_ea_cycle_table[ea_mode][cpu_type][size] + 2;
 
+		/* BTST Dn, #imm on 68000 takes 10 cycles (base 4 + EA 4 + 2 internal).
+		 * The +2 is specific to the register-count, immediate-EA variant
+		 * (btst 8 r . with EA_MODE_I). Verified against tomharte SST. */
+		if(cpu_type == CPU_TYPE_000 && ea_mode == EA_MODE_I &&
+		   strcmp(op->name, "btst") == 0 && strcmp(op->spec_proc, "r") == 0)
+			return op->cycles[cpu_type] + g_ea_cycle_table[ea_mode][cpu_type][size] + 2;
+
 		if(strcmp(op->name, "jmp") == 0)
 			return op->cycles[cpu_type] + g_jmp_cycle_table[ea_mode];
 		if(strcmp(op->name, "jsr") == 0)

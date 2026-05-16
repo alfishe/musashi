@@ -3620,7 +3620,6 @@ static void m68k_op_asr_8_r(void)
 	uint* r_dst = &DY;
 	uint shift = DX & 0x3f;
 	uint src = MASK_OUT_ABOVE_8(*r_dst);
-	uint res = src >> shift;
 
 	if(shift != 0 )
 	{
@@ -3629,6 +3628,7 @@ static void m68k_op_asr_8_r(void)
 
 		if(shift < 8)
 		{
+			uint res = src >> shift;
 			if(GET_MSB_8(src))
 				res |= m68ki_shift_8_table[shift];
 
@@ -3706,7 +3706,6 @@ static void m68k_op_asr_16_r(void)
 	uint* r_dst = &DY;
 	uint shift = DX & 0x3f;
 	uint src = MASK_OUT_ABOVE_16(*r_dst);
-	uint res = src >> shift;
 
 	if(shift != 0)
 	{
@@ -3715,6 +3714,7 @@ static void m68k_op_asr_16_r(void)
 
 		if(shift < 16)
 		{
+			uint res = src >> shift;
 			if(GET_MSB_16(src))
 				res |= m68ki_shift_16_table[shift];
 
@@ -3767,7 +3767,6 @@ static void m68k_op_asr_32_r(void)
 	uint* r_dst = &DY;
 	uint shift = DX & 0x3f;
 	uint src = *r_dst;
-	uint res = src >> shift;
 
 	if(shift != 0)
 	{
@@ -3776,6 +3775,7 @@ static void m68k_op_asr_32_r(void)
 
 		if(shift < 32)
 		{
+			uint res = src >> shift;
 			if(GET_MSB_32(src))
 				res |= m68ki_shift_32_table[shift];
 
@@ -4014,7 +4014,6 @@ static void m68k_op_asl_8_r(void)
 	uint* r_dst = &DY;
 	uint shift = DX & 0x3f;
 	uint src = MASK_OUT_ABOVE_8(*r_dst);
-	uint res = MASK_OUT_ABOVE_8(src << shift);
 
 	if(shift != 0)
 	{
@@ -4023,6 +4022,7 @@ static void m68k_op_asl_8_r(void)
 
 		if(shift < 8)
 		{
+			uint res = MASK_OUT_ABOVE_8(src << shift);
 			*r_dst = MASK_OUT_BELOW_8(*r_dst) | res;
 			FLAG_X = FLAG_C = src << shift;
 			FLAG_N = NFLAG_8(res);
@@ -4052,7 +4052,6 @@ static void m68k_op_asl_16_r(void)
 	uint* r_dst = &DY;
 	uint shift = DX & 0x3f;
 	uint src = MASK_OUT_ABOVE_16(*r_dst);
-	uint res = MASK_OUT_ABOVE_16(src << shift);
 
 	if(shift != 0)
 	{
@@ -4061,6 +4060,7 @@ static void m68k_op_asl_16_r(void)
 
 		if(shift < 16)
 		{
+			uint res = MASK_OUT_ABOVE_16(src << shift);
 			*r_dst = MASK_OUT_BELOW_16(*r_dst) | res;
 			FLAG_X = FLAG_C = (src << shift) >> 8;
 			FLAG_N = NFLAG_16(res);
@@ -4090,7 +4090,6 @@ static void m68k_op_asl_32_r(void)
 	uint* r_dst = &DY;
 	uint shift = DX & 0x3f;
 	uint src = *r_dst;
-	uint res = MASK_OUT_ABOVE_32(src << shift);
 
 	if(shift != 0)
 	{
@@ -4099,6 +4098,7 @@ static void m68k_op_asl_32_r(void)
 
 		if(shift < 32)
 		{
+			uint res = MASK_OUT_ABOVE_32(src << shift);
 			*r_dst = res;
 			FLAG_X = FLAG_C = (src >> (32 - shift)) << 8;
 			FLAG_N = NFLAG_32(res);
@@ -9494,6 +9494,19 @@ static void m68k_op_chk_16_d(void)
 		return;
 	}
 	FLAG_N = (src < 0)<<7;
+
+	/* CHK trap cycle cost on 68000 is data-dependent:
+	 *   src < 0 AND bound >= 0: 30 + CYC_INSTRUCTION total
+	 *   src < 0 AND bound < 0:  28 + CYC_INSTRUCTION total
+	 *   src >= 0 (over-bound):  28 + CYC_INSTRUCTION total
+	 * The standard exception mechanism gives flat CYC_EXCEPTION[6]=40,
+	 * so we adjust the delta before calling m68ki_exception_trap(). */
+	if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+	{
+		int desired = 28 + ((src < 0 && bound >= 0) ? 2 : 0);
+		USE_CYCLES(desired + (int)CYC_INSTRUCTION[REG_IR] - 40);
+	}
+
 	m68ki_exception_trap(EXCEPTION_CHK);
 }
 
@@ -9512,6 +9525,19 @@ static void m68k_op_chk_16_ai(void)
 		return;
 	}
 	FLAG_N = (src < 0)<<7;
+
+	/* CHK trap cycle cost on 68000 is data-dependent:
+	 *   src < 0 AND bound >= 0: 30 + CYC_INSTRUCTION total
+	 *   src < 0 AND bound < 0:  28 + CYC_INSTRUCTION total
+	 *   src >= 0 (over-bound):  28 + CYC_INSTRUCTION total
+	 * The standard exception mechanism gives flat CYC_EXCEPTION[6]=40,
+	 * so we adjust the delta before calling m68ki_exception_trap(). */
+	if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+	{
+		int desired = 28 + ((src < 0 && bound >= 0) ? 2 : 0);
+		USE_CYCLES(desired + (int)CYC_INSTRUCTION[REG_IR] - 40);
+	}
+
 	m68ki_exception_trap(EXCEPTION_CHK);
 }
 
@@ -9530,6 +9556,19 @@ static void m68k_op_chk_16_pi(void)
 		return;
 	}
 	FLAG_N = (src < 0)<<7;
+
+	/* CHK trap cycle cost on 68000 is data-dependent:
+	 *   src < 0 AND bound >= 0: 30 + CYC_INSTRUCTION total
+	 *   src < 0 AND bound < 0:  28 + CYC_INSTRUCTION total
+	 *   src >= 0 (over-bound):  28 + CYC_INSTRUCTION total
+	 * The standard exception mechanism gives flat CYC_EXCEPTION[6]=40,
+	 * so we adjust the delta before calling m68ki_exception_trap(). */
+	if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+	{
+		int desired = 28 + ((src < 0 && bound >= 0) ? 2 : 0);
+		USE_CYCLES(desired + (int)CYC_INSTRUCTION[REG_IR] - 40);
+	}
+
 	m68ki_exception_trap(EXCEPTION_CHK);
 }
 
@@ -9548,6 +9587,19 @@ static void m68k_op_chk_16_pd(void)
 		return;
 	}
 	FLAG_N = (src < 0)<<7;
+
+	/* CHK trap cycle cost on 68000 is data-dependent:
+	 *   src < 0 AND bound >= 0: 30 + CYC_INSTRUCTION total
+	 *   src < 0 AND bound < 0:  28 + CYC_INSTRUCTION total
+	 *   src >= 0 (over-bound):  28 + CYC_INSTRUCTION total
+	 * The standard exception mechanism gives flat CYC_EXCEPTION[6]=40,
+	 * so we adjust the delta before calling m68ki_exception_trap(). */
+	if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+	{
+		int desired = 28 + ((src < 0 && bound >= 0) ? 2 : 0);
+		USE_CYCLES(desired + (int)CYC_INSTRUCTION[REG_IR] - 40);
+	}
+
 	m68ki_exception_trap(EXCEPTION_CHK);
 }
 
@@ -9566,6 +9618,19 @@ static void m68k_op_chk_16_di(void)
 		return;
 	}
 	FLAG_N = (src < 0)<<7;
+
+	/* CHK trap cycle cost on 68000 is data-dependent:
+	 *   src < 0 AND bound >= 0: 30 + CYC_INSTRUCTION total
+	 *   src < 0 AND bound < 0:  28 + CYC_INSTRUCTION total
+	 *   src >= 0 (over-bound):  28 + CYC_INSTRUCTION total
+	 * The standard exception mechanism gives flat CYC_EXCEPTION[6]=40,
+	 * so we adjust the delta before calling m68ki_exception_trap(). */
+	if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+	{
+		int desired = 28 + ((src < 0 && bound >= 0) ? 2 : 0);
+		USE_CYCLES(desired + (int)CYC_INSTRUCTION[REG_IR] - 40);
+	}
+
 	m68ki_exception_trap(EXCEPTION_CHK);
 }
 
@@ -9584,6 +9649,19 @@ static void m68k_op_chk_16_ix(void)
 		return;
 	}
 	FLAG_N = (src < 0)<<7;
+
+	/* CHK trap cycle cost on 68000 is data-dependent:
+	 *   src < 0 AND bound >= 0: 30 + CYC_INSTRUCTION total
+	 *   src < 0 AND bound < 0:  28 + CYC_INSTRUCTION total
+	 *   src >= 0 (over-bound):  28 + CYC_INSTRUCTION total
+	 * The standard exception mechanism gives flat CYC_EXCEPTION[6]=40,
+	 * so we adjust the delta before calling m68ki_exception_trap(). */
+	if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+	{
+		int desired = 28 + ((src < 0 && bound >= 0) ? 2 : 0);
+		USE_CYCLES(desired + (int)CYC_INSTRUCTION[REG_IR] - 40);
+	}
+
 	m68ki_exception_trap(EXCEPTION_CHK);
 }
 
@@ -9602,6 +9680,19 @@ static void m68k_op_chk_16_aw(void)
 		return;
 	}
 	FLAG_N = (src < 0)<<7;
+
+	/* CHK trap cycle cost on 68000 is data-dependent:
+	 *   src < 0 AND bound >= 0: 30 + CYC_INSTRUCTION total
+	 *   src < 0 AND bound < 0:  28 + CYC_INSTRUCTION total
+	 *   src >= 0 (over-bound):  28 + CYC_INSTRUCTION total
+	 * The standard exception mechanism gives flat CYC_EXCEPTION[6]=40,
+	 * so we adjust the delta before calling m68ki_exception_trap(). */
+	if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+	{
+		int desired = 28 + ((src < 0 && bound >= 0) ? 2 : 0);
+		USE_CYCLES(desired + (int)CYC_INSTRUCTION[REG_IR] - 40);
+	}
+
 	m68ki_exception_trap(EXCEPTION_CHK);
 }
 
@@ -9620,6 +9711,19 @@ static void m68k_op_chk_16_al(void)
 		return;
 	}
 	FLAG_N = (src < 0)<<7;
+
+	/* CHK trap cycle cost on 68000 is data-dependent:
+	 *   src < 0 AND bound >= 0: 30 + CYC_INSTRUCTION total
+	 *   src < 0 AND bound < 0:  28 + CYC_INSTRUCTION total
+	 *   src >= 0 (over-bound):  28 + CYC_INSTRUCTION total
+	 * The standard exception mechanism gives flat CYC_EXCEPTION[6]=40,
+	 * so we adjust the delta before calling m68ki_exception_trap(). */
+	if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+	{
+		int desired = 28 + ((src < 0 && bound >= 0) ? 2 : 0);
+		USE_CYCLES(desired + (int)CYC_INSTRUCTION[REG_IR] - 40);
+	}
+
 	m68ki_exception_trap(EXCEPTION_CHK);
 }
 
@@ -9638,6 +9742,19 @@ static void m68k_op_chk_16_pcdi(void)
 		return;
 	}
 	FLAG_N = (src < 0)<<7;
+
+	/* CHK trap cycle cost on 68000 is data-dependent:
+	 *   src < 0 AND bound >= 0: 30 + CYC_INSTRUCTION total
+	 *   src < 0 AND bound < 0:  28 + CYC_INSTRUCTION total
+	 *   src >= 0 (over-bound):  28 + CYC_INSTRUCTION total
+	 * The standard exception mechanism gives flat CYC_EXCEPTION[6]=40,
+	 * so we adjust the delta before calling m68ki_exception_trap(). */
+	if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+	{
+		int desired = 28 + ((src < 0 && bound >= 0) ? 2 : 0);
+		USE_CYCLES(desired + (int)CYC_INSTRUCTION[REG_IR] - 40);
+	}
+
 	m68ki_exception_trap(EXCEPTION_CHK);
 }
 
@@ -9656,6 +9773,19 @@ static void m68k_op_chk_16_pcix(void)
 		return;
 	}
 	FLAG_N = (src < 0)<<7;
+
+	/* CHK trap cycle cost on 68000 is data-dependent:
+	 *   src < 0 AND bound >= 0: 30 + CYC_INSTRUCTION total
+	 *   src < 0 AND bound < 0:  28 + CYC_INSTRUCTION total
+	 *   src >= 0 (over-bound):  28 + CYC_INSTRUCTION total
+	 * The standard exception mechanism gives flat CYC_EXCEPTION[6]=40,
+	 * so we adjust the delta before calling m68ki_exception_trap(). */
+	if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+	{
+		int desired = 28 + ((src < 0 && bound >= 0) ? 2 : 0);
+		USE_CYCLES(desired + (int)CYC_INSTRUCTION[REG_IR] - 40);
+	}
+
 	m68ki_exception_trap(EXCEPTION_CHK);
 }
 
@@ -9674,6 +9804,19 @@ static void m68k_op_chk_16_i(void)
 		return;
 	}
 	FLAG_N = (src < 0)<<7;
+
+	/* CHK trap cycle cost on 68000 is data-dependent:
+	 *   src < 0 AND bound >= 0: 30 + CYC_INSTRUCTION total
+	 *   src < 0 AND bound < 0:  28 + CYC_INSTRUCTION total
+	 *   src >= 0 (over-bound):  28 + CYC_INSTRUCTION total
+	 * The standard exception mechanism gives flat CYC_EXCEPTION[6]=40,
+	 * so we adjust the delta before calling m68ki_exception_trap(). */
+	if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+	{
+		int desired = 28 + ((src < 0 && bound >= 0) ? 2 : 0);
+		USE_CYCLES(desired + (int)CYC_INSTRUCTION[REG_IR] - 40);
+	}
+
 	m68ki_exception_trap(EXCEPTION_CHK);
 }
 
@@ -17263,7 +17406,6 @@ static void m68k_op_lsr_8_r(void)
 	uint* r_dst = &DY;
 	uint shift = DX & 0x3f;
 	uint src = MASK_OUT_ABOVE_8(*r_dst);
-	uint res = src >> shift;
 
 	if(shift != 0)
 	{
@@ -17272,6 +17414,7 @@ static void m68k_op_lsr_8_r(void)
 
 		if(shift <= 8)
 		{
+			uint res = src >> shift;
 			*r_dst = MASK_OUT_BELOW_8(*r_dst) | res;
 			FLAG_X = FLAG_C = src << (9-shift);
 			FLAG_N = NFLAG_CLEAR;
@@ -17301,7 +17444,6 @@ static void m68k_op_lsr_16_r(void)
 	uint* r_dst = &DY;
 	uint shift = DX & 0x3f;
 	uint src = MASK_OUT_ABOVE_16(*r_dst);
-	uint res = src >> shift;
 
 	if(shift != 0)
 	{
@@ -17310,6 +17452,7 @@ static void m68k_op_lsr_16_r(void)
 
 		if(shift <= 16)
 		{
+			uint res = src >> shift;
 			*r_dst = MASK_OUT_BELOW_16(*r_dst) | res;
 			FLAG_C = FLAG_X = (src >> (shift - 1))<<8;
 			FLAG_N = NFLAG_CLEAR;
@@ -17339,7 +17482,6 @@ static void m68k_op_lsr_32_r(void)
 	uint* r_dst = &DY;
 	uint shift = DX & 0x3f;
 	uint src = *r_dst;
-	uint res = src >> shift;
 
 	if(shift != 0)
 	{
@@ -17348,6 +17490,7 @@ static void m68k_op_lsr_32_r(void)
 
 		if(shift < 32)
 		{
+			uint res = src >> shift;
 			*r_dst = res;
 			FLAG_C = FLAG_X = (src >> (shift - 1))<<8;
 			FLAG_N = NFLAG_CLEAR;
@@ -17538,7 +17681,6 @@ static void m68k_op_lsl_8_r(void)
 	uint* r_dst = &DY;
 	uint shift = DX & 0x3f;
 	uint src = MASK_OUT_ABOVE_8(*r_dst);
-	uint res = MASK_OUT_ABOVE_8(src << shift);
 
 	if(shift != 0)
 	{
@@ -17547,6 +17689,7 @@ static void m68k_op_lsl_8_r(void)
 
 		if(shift <= 8)
 		{
+			uint res = MASK_OUT_ABOVE_8(src << shift);
 			*r_dst = MASK_OUT_BELOW_8(*r_dst) | res;
 			FLAG_X = FLAG_C = src << shift;
 			FLAG_N = NFLAG_8(res);
@@ -17576,7 +17719,6 @@ static void m68k_op_lsl_16_r(void)
 	uint* r_dst = &DY;
 	uint shift = DX & 0x3f;
 	uint src = MASK_OUT_ABOVE_16(*r_dst);
-	uint res = MASK_OUT_ABOVE_16(src << shift);
 
 	if(shift != 0)
 	{
@@ -17585,6 +17727,7 @@ static void m68k_op_lsl_16_r(void)
 
 		if(shift <= 16)
 		{
+			uint res = MASK_OUT_ABOVE_16(src << shift);
 			*r_dst = MASK_OUT_BELOW_16(*r_dst) | res;
 			FLAG_X = FLAG_C = (src << shift) >> 8;
 			FLAG_N = NFLAG_16(res);
@@ -17614,15 +17757,15 @@ static void m68k_op_lsl_32_r(void)
 	uint* r_dst = &DY;
 	uint shift = DX & 0x3f;
 	uint src = *r_dst;
-	uint res = MASK_OUT_ABOVE_32(src << shift);
 
 	if(shift != 0)
 	{
 		if (CPU_TYPE_IS_010_LESS(CPU_TYPE))
-				USE_CYCLES(shift<<CYC_SHIFT);
+			USE_CYCLES(shift<<CYC_SHIFT);
 
 		if(shift < 32)
 		{
+			uint res = MASK_OUT_ABOVE_32(src << shift);
 			*r_dst = res;
 			FLAG_X = FLAG_C = (src >> (32 - shift)) << 8;
 			FLAG_N = NFLAG_32(res);
@@ -24814,12 +24957,14 @@ static void m68k_op_muls_16_d(void)
 	uint x = MAKE_INT_16(DY);
 	if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
 		uint c = 0;
-		for (uint y = x, f = 0; y; y>>=1) {
+		uint f = 0;
+		for (uint y = x; y; y>>=1) {
 			if ((y&1) != f) {
 				c += 2;
 				f = 1 - f;
 			}
 		}
+		if (f && !(x & 0x80000000)) c += 2; /* final transition for positive multipliers */
 		USE_CYCLES(c);
 	}
 
@@ -24840,12 +24985,14 @@ static void m68k_op_muls_16_ai(void)
 	uint x = MAKE_INT_16(OPER_AY_AI_16());
 	if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
 		uint c = 0;
-		for (uint y = x, f = 0; y; y>>=1) {
+		uint f = 0;
+		for (uint y = x; y; y>>=1) {
 			if ((y&1) != f) {
 				c += 2;
 				f = 1 - f;
 			}
 		}
+		if (f && !(x & 0x80000000)) c += 2; /* final transition for positive multipliers */
 		USE_CYCLES(c);
 	}
 	uint res = MASK_OUT_ABOVE_32(x * MAKE_INT_16(MASK_OUT_ABOVE_16(*r_dst)));
@@ -24865,12 +25012,14 @@ static void m68k_op_muls_16_pi(void)
 	uint x = MAKE_INT_16(OPER_AY_PI_16());
 	if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
 		uint c = 0;
-		for (uint y = x, f = 0; y; y>>=1) {
+		uint f = 0;
+		for (uint y = x; y; y>>=1) {
 			if ((y&1) != f) {
 				c += 2;
 				f = 1 - f;
 			}
 		}
+		if (f && !(x & 0x80000000)) c += 2; /* final transition for positive multipliers */
 		USE_CYCLES(c);
 	}
 	uint res = MASK_OUT_ABOVE_32(x * MAKE_INT_16(MASK_OUT_ABOVE_16(*r_dst)));
@@ -24890,12 +25039,14 @@ static void m68k_op_muls_16_pd(void)
 	uint x = MAKE_INT_16(OPER_AY_PD_16());
 	if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
 		uint c = 0;
-		for (uint y = x, f = 0; y; y>>=1) {
+		uint f = 0;
+		for (uint y = x; y; y>>=1) {
 			if ((y&1) != f) {
 				c += 2;
 				f = 1 - f;
 			}
 		}
+		if (f && !(x & 0x80000000)) c += 2; /* final transition for positive multipliers */
 		USE_CYCLES(c);
 	}
 	uint res = MASK_OUT_ABOVE_32(x * MAKE_INT_16(MASK_OUT_ABOVE_16(*r_dst)));
@@ -24915,12 +25066,14 @@ static void m68k_op_muls_16_di(void)
 	uint x = MAKE_INT_16(OPER_AY_DI_16());
 	if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
 		uint c = 0;
-		for (uint y = x, f = 0; y; y>>=1) {
+		uint f = 0;
+		for (uint y = x; y; y>>=1) {
 			if ((y&1) != f) {
 				c += 2;
 				f = 1 - f;
 			}
 		}
+		if (f && !(x & 0x80000000)) c += 2; /* final transition for positive multipliers */
 		USE_CYCLES(c);
 	}
 	uint res = MASK_OUT_ABOVE_32(x * MAKE_INT_16(MASK_OUT_ABOVE_16(*r_dst)));
@@ -24940,12 +25093,14 @@ static void m68k_op_muls_16_ix(void)
 	uint x = MAKE_INT_16(OPER_AY_IX_16());
 	if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
 		uint c = 0;
-		for (uint y = x, f = 0; y; y>>=1) {
+		uint f = 0;
+		for (uint y = x; y; y>>=1) {
 			if ((y&1) != f) {
 				c += 2;
 				f = 1 - f;
 			}
 		}
+		if (f && !(x & 0x80000000)) c += 2; /* final transition for positive multipliers */
 		USE_CYCLES(c);
 	}
 	uint res = MASK_OUT_ABOVE_32(x * MAKE_INT_16(MASK_OUT_ABOVE_16(*r_dst)));
@@ -24965,12 +25120,14 @@ static void m68k_op_muls_16_aw(void)
 	uint x = MAKE_INT_16(OPER_AW_16());
 	if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
 		uint c = 0;
-		for (uint y = x, f = 0; y; y>>=1) {
+		uint f = 0;
+		for (uint y = x; y; y>>=1) {
 			if ((y&1) != f) {
 				c += 2;
 				f = 1 - f;
 			}
 		}
+		if (f && !(x & 0x80000000)) c += 2; /* final transition for positive multipliers */
 		USE_CYCLES(c);
 	}
 	uint res = MASK_OUT_ABOVE_32(x * MAKE_INT_16(MASK_OUT_ABOVE_16(*r_dst)));
@@ -24990,12 +25147,14 @@ static void m68k_op_muls_16_al(void)
 	uint x = MAKE_INT_16(OPER_AL_16());
 	if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
 		uint c = 0;
-		for (uint y = x, f = 0; y; y>>=1) {
+		uint f = 0;
+		for (uint y = x; y; y>>=1) {
 			if ((y&1) != f) {
 				c += 2;
 				f = 1 - f;
 			}
 		}
+		if (f && !(x & 0x80000000)) c += 2; /* final transition for positive multipliers */
 		USE_CYCLES(c);
 	}
 	uint res = MASK_OUT_ABOVE_32(x * MAKE_INT_16(MASK_OUT_ABOVE_16(*r_dst)));
@@ -25015,12 +25174,14 @@ static void m68k_op_muls_16_pcdi(void)
 	uint x = MAKE_INT_16(OPER_PCDI_16());
 	if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
 		uint c = 0;
-		for (uint y = x, f = 0; y; y>>=1) {
+		uint f = 0;
+		for (uint y = x; y; y>>=1) {
 			if ((y&1) != f) {
 				c += 2;
 				f = 1 - f;
 			}
 		}
+		if (f && !(x & 0x80000000)) c += 2; /* final transition for positive multipliers */
 		USE_CYCLES(c);
 	}
 	uint res = MASK_OUT_ABOVE_32(x * MAKE_INT_16(MASK_OUT_ABOVE_16(*r_dst)));
@@ -25040,12 +25201,14 @@ static void m68k_op_muls_16_pcix(void)
 	uint x = MAKE_INT_16(OPER_PCIX_16());
 	if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
 		uint c = 0;
-		for (uint y = x, f = 0; y; y>>=1) {
+		uint f = 0;
+		for (uint y = x; y; y>>=1) {
 			if ((y&1) != f) {
 				c += 2;
 				f = 1 - f;
 			}
 		}
+		if (f && !(x & 0x80000000)) c += 2; /* final transition for positive multipliers */
 		USE_CYCLES(c);
 	}
 	uint res = MASK_OUT_ABOVE_32(x * MAKE_INT_16(MASK_OUT_ABOVE_16(*r_dst)));
@@ -25065,12 +25228,14 @@ static void m68k_op_muls_16_i(void)
 	uint x = MAKE_INT_16(OPER_I_16());
 	if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
 		uint c = 0;
-		for (uint y = x, f = 0; y; y>>=1) {
+		uint f = 0;
+		for (uint y = x; y; y>>=1) {
 			if ((y&1) != f) {
 				c += 2;
 				f = 1 - f;
 			}
 		}
+		if (f && !(x & 0x80000000)) c += 2; /* final transition for positive multipliers */
 		USE_CYCLES(c);
 	}
 	uint res = MASK_OUT_ABOVE_32(x * MAKE_INT_16(MASK_OUT_ABOVE_16(*r_dst)));
@@ -36524,7 +36689,7 @@ static const opcode_handler_struct m68k_opcode_handler_table[] =
 	{m68k_op_btst_8_r_al         , 0xf1ff, 0x0139, { 16,  16,   8,   8,   8}},
 	{m68k_op_btst_8_r_pcdi       , 0xf1ff, 0x013a, { 12,  12,   9,   9,   9}},
 	{m68k_op_btst_8_r_pcix       , 0xf1ff, 0x013b, { 14,  14,  11,  11,  11}},
-	{m68k_op_btst_8_r_i          , 0xf1ff, 0x013c, {  8,   8,   6,   6,   6}},
+	{m68k_op_btst_8_r_i          , 0xf1ff, 0x013c, { 10,   8,   6,   6,   6}},
 	{m68k_op_bchg_8_r_pi7        , 0xf1ff, 0x015f, { 12,  12,   8,   8,   8}},
 	{m68k_op_bchg_8_r_pd7        , 0xf1ff, 0x0167, { 14,  14,   9,   9,   9}},
 	{m68k_op_bchg_8_r_aw         , 0xf1ff, 0x0178, { 16,  16,   8,   8,   8}},
@@ -37933,7 +38098,6 @@ static const opcode_handler_struct m68k_opcode_handler_table[] =
 void m68ki_build_opcode_table(void)
 {
 	const opcode_handler_struct *ostruct;
-	int cycle_cost;
 	int instr;
 	int i;
 	int j;

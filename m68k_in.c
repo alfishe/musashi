@@ -167,7 +167,6 @@ M68KMAKE_TABLE_FOOTER
 void m68ki_build_opcode_table(void)
 {
 	const opcode_handler_struct *ostruct;
-	int cycle_cost;
 	int instr;
 	int i;
 	int j;
@@ -2053,7 +2052,6 @@ M68KMAKE_OP(asr, 8, r, .)
 	uint* r_dst = &DY;
 	uint shift = DX & 0x3f;
 	uint src = MASK_OUT_ABOVE_8(*r_dst);
-	uint res = src >> shift;
 
 	if(shift != 0 )
 	{
@@ -2062,6 +2060,7 @@ M68KMAKE_OP(asr, 8, r, .)
 
 		if(shift < 8)
 		{
+			uint res = src >> shift;
 			if(GET_MSB_8(src))
 				res |= m68ki_shift_8_table[shift];
 
@@ -2139,7 +2138,6 @@ M68KMAKE_OP(asr, 16, r, .)
 	uint* r_dst = &DY;
 	uint shift = DX & 0x3f;
 	uint src = MASK_OUT_ABOVE_16(*r_dst);
-	uint res = src >> shift;
 
 	if(shift != 0)
 	{
@@ -2148,6 +2146,7 @@ M68KMAKE_OP(asr, 16, r, .)
 
 		if(shift < 16)
 		{
+			uint res = src >> shift;
 			if(GET_MSB_16(src))
 				res |= m68ki_shift_16_table[shift];
 
@@ -2200,7 +2199,6 @@ M68KMAKE_OP(asr, 32, r, .)
 	uint* r_dst = &DY;
 	uint shift = DX & 0x3f;
 	uint src = *r_dst;
-	uint res = src >> shift;
 
 	if(shift != 0)
 	{
@@ -2209,6 +2207,7 @@ M68KMAKE_OP(asr, 32, r, .)
 
 		if(shift < 32)
 		{
+			uint res = src >> shift;
 			if(GET_MSB_32(src))
 				res |= m68ki_shift_32_table[shift];
 
@@ -2339,7 +2338,6 @@ M68KMAKE_OP(asl, 8, r, .)
 	uint* r_dst = &DY;
 	uint shift = DX & 0x3f;
 	uint src = MASK_OUT_ABOVE_8(*r_dst);
-	uint res = MASK_OUT_ABOVE_8(src << shift);
 
 	if(shift != 0)
 	{
@@ -2348,6 +2346,7 @@ M68KMAKE_OP(asl, 8, r, .)
 
 		if(shift < 8)
 		{
+			uint res = MASK_OUT_ABOVE_8(src << shift);
 			*r_dst = MASK_OUT_BELOW_8(*r_dst) | res;
 			FLAG_X = FLAG_C = src << shift;
 			FLAG_N = NFLAG_8(res);
@@ -2377,7 +2376,6 @@ M68KMAKE_OP(asl, 16, r, .)
 	uint* r_dst = &DY;
 	uint shift = DX & 0x3f;
 	uint src = MASK_OUT_ABOVE_16(*r_dst);
-	uint res = MASK_OUT_ABOVE_16(src << shift);
 
 	if(shift != 0)
 	{
@@ -2386,6 +2384,7 @@ M68KMAKE_OP(asl, 16, r, .)
 
 		if(shift < 16)
 		{
+			uint res = MASK_OUT_ABOVE_16(src << shift);
 			*r_dst = MASK_OUT_BELOW_16(*r_dst) | res;
 			FLAG_X = FLAG_C = (src << shift) >> 8;
 			FLAG_N = NFLAG_16(res);
@@ -2415,7 +2414,6 @@ M68KMAKE_OP(asl, 32, r, .)
 	uint* r_dst = &DY;
 	uint shift = DX & 0x3f;
 	uint src = *r_dst;
-	uint res = MASK_OUT_ABOVE_32(src << shift);
 
 	if(shift != 0)
 	{
@@ -2424,6 +2422,7 @@ M68KMAKE_OP(asl, 32, r, .)
 
 		if(shift < 32)
 		{
+			uint res = MASK_OUT_ABOVE_32(src << shift);
 			*r_dst = res;
 			FLAG_X = FLAG_C = (src >> (32 - shift)) << 8;
 			FLAG_N = NFLAG_32(res);
@@ -3665,6 +3664,19 @@ M68KMAKE_OP(chk, 16, ., d)
 		return;
 	}
 	FLAG_N = (src < 0)<<7;
+
+	/* CHK trap cycle cost on 68000 is data-dependent:
+	 *   src < 0 AND bound >= 0: 30 + CYC_INSTRUCTION total
+	 *   src < 0 AND bound < 0:  28 + CYC_INSTRUCTION total
+	 *   src >= 0 (over-bound):  28 + CYC_INSTRUCTION total
+	 * The standard exception mechanism gives flat CYC_EXCEPTION[6]=40,
+	 * so we adjust the delta before calling m68ki_exception_trap(). */
+	if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+	{
+		int desired = 28 + ((src < 0 && bound >= 0) ? 2 : 0);
+		USE_CYCLES(desired + (int)CYC_INSTRUCTION[REG_IR] - 40);
+	}
+
 	m68ki_exception_trap(EXCEPTION_CHK);
 }
 
@@ -3683,6 +3695,19 @@ M68KMAKE_OP(chk, 16, ., .)
 		return;
 	}
 	FLAG_N = (src < 0)<<7;
+
+	/* CHK trap cycle cost on 68000 is data-dependent:
+	 *   src < 0 AND bound >= 0: 30 + CYC_INSTRUCTION total
+	 *   src < 0 AND bound < 0:  28 + CYC_INSTRUCTION total
+	 *   src >= 0 (over-bound):  28 + CYC_INSTRUCTION total
+	 * The standard exception mechanism gives flat CYC_EXCEPTION[6]=40,
+	 * so we adjust the delta before calling m68ki_exception_trap(). */
+	if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+	{
+		int desired = 28 + ((src < 0 && bound >= 0) ? 2 : 0);
+		USE_CYCLES(desired + (int)CYC_INSTRUCTION[REG_IR] - 40);
+	}
+
 	m68ki_exception_trap(EXCEPTION_CHK);
 }
 
@@ -5673,7 +5698,6 @@ M68KMAKE_OP(lsr, 8, r, .)
 	uint* r_dst = &DY;
 	uint shift = DX & 0x3f;
 	uint src = MASK_OUT_ABOVE_8(*r_dst);
-	uint res = src >> shift;
 
 	if(shift != 0)
 	{
@@ -5682,6 +5706,7 @@ M68KMAKE_OP(lsr, 8, r, .)
 
 		if(shift <= 8)
 		{
+			uint res = src >> shift;
 			*r_dst = MASK_OUT_BELOW_8(*r_dst) | res;
 			FLAG_X = FLAG_C = src << (9-shift);
 			FLAG_N = NFLAG_CLEAR;
@@ -5711,7 +5736,6 @@ M68KMAKE_OP(lsr, 16, r, .)
 	uint* r_dst = &DY;
 	uint shift = DX & 0x3f;
 	uint src = MASK_OUT_ABOVE_16(*r_dst);
-	uint res = src >> shift;
 
 	if(shift != 0)
 	{
@@ -5720,6 +5744,7 @@ M68KMAKE_OP(lsr, 16, r, .)
 
 		if(shift <= 16)
 		{
+			uint res = src >> shift;
 			*r_dst = MASK_OUT_BELOW_16(*r_dst) | res;
 			FLAG_C = FLAG_X = (src >> (shift - 1))<<8;
 			FLAG_N = NFLAG_CLEAR;
@@ -5749,7 +5774,6 @@ M68KMAKE_OP(lsr, 32, r, .)
 	uint* r_dst = &DY;
 	uint shift = DX & 0x3f;
 	uint src = *r_dst;
-	uint res = src >> shift;
 
 	if(shift != 0)
 	{
@@ -5758,6 +5782,7 @@ M68KMAKE_OP(lsr, 32, r, .)
 
 		if(shift < 32)
 		{
+			uint res = src >> shift;
 			*r_dst = res;
 			FLAG_C = FLAG_X = (src >> (shift - 1))<<8;
 			FLAG_N = NFLAG_CLEAR;
@@ -5858,7 +5883,6 @@ M68KMAKE_OP(lsl, 8, r, .)
 	uint* r_dst = &DY;
 	uint shift = DX & 0x3f;
 	uint src = MASK_OUT_ABOVE_8(*r_dst);
-	uint res = MASK_OUT_ABOVE_8(src << shift);
 
 	if(shift != 0)
 	{
@@ -5867,6 +5891,7 @@ M68KMAKE_OP(lsl, 8, r, .)
 
 		if(shift <= 8)
 		{
+			uint res = MASK_OUT_ABOVE_8(src << shift);
 			*r_dst = MASK_OUT_BELOW_8(*r_dst) | res;
 			FLAG_X = FLAG_C = src << shift;
 			FLAG_N = NFLAG_8(res);
@@ -5896,7 +5921,6 @@ M68KMAKE_OP(lsl, 16, r, .)
 	uint* r_dst = &DY;
 	uint shift = DX & 0x3f;
 	uint src = MASK_OUT_ABOVE_16(*r_dst);
-	uint res = MASK_OUT_ABOVE_16(src << shift);
 
 	if(shift != 0)
 	{
@@ -5905,6 +5929,7 @@ M68KMAKE_OP(lsl, 16, r, .)
 
 		if(shift <= 16)
 		{
+			uint res = MASK_OUT_ABOVE_16(src << shift);
 			*r_dst = MASK_OUT_BELOW_16(*r_dst) | res;
 			FLAG_X = FLAG_C = (src << shift) >> 8;
 			FLAG_N = NFLAG_16(res);
@@ -5934,15 +5959,15 @@ M68KMAKE_OP(lsl, 32, r, .)
 	uint* r_dst = &DY;
 	uint shift = DX & 0x3f;
 	uint src = *r_dst;
-	uint res = MASK_OUT_ABOVE_32(src << shift);
 
 	if(shift != 0)
 	{
 		if (CPU_TYPE_IS_010_LESS(CPU_TYPE))
-				USE_CYCLES(shift<<CYC_SHIFT);
+			USE_CYCLES(shift<<CYC_SHIFT);
 
 		if(shift < 32)
 		{
+			uint res = MASK_OUT_ABOVE_32(src << shift);
 			*r_dst = res;
 			FLAG_X = FLAG_C = (src >> (32 - shift)) << 8;
 			FLAG_N = NFLAG_32(res);
@@ -7933,12 +7958,14 @@ M68KMAKE_OP(muls, 16, ., d)
 	uint x = MAKE_INT_16(DY);
 	if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
 		uint c = 0;
-		for (uint y = x, f = 0; y; y>>=1) {
+		uint f = 0;
+		for (uint y = x; y; y>>=1) {
 			if ((y&1) != f) {
 				c += 2;
 				f = 1 - f;
 			}
 		}
+		if (f && !(x & 0x80000000)) c += 2; /* final transition for positive multipliers */
 		USE_CYCLES(c);
 	}
 
@@ -7959,12 +7986,14 @@ M68KMAKE_OP(muls, 16, ., .)
 	uint x = MAKE_INT_16(M68KMAKE_GET_OPER_AY_16);
 	if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
 		uint c = 0;
-		for (uint y = x, f = 0; y; y>>=1) {
+		uint f = 0;
+		for (uint y = x; y; y>>=1) {
 			if ((y&1) != f) {
 				c += 2;
 				f = 1 - f;
 			}
 		}
+		if (f && !(x & 0x80000000)) c += 2; /* final transition for positive multipliers */
 		USE_CYCLES(c);
 	}
 	uint res = MASK_OUT_ABOVE_32(x * MAKE_INT_16(MASK_OUT_ABOVE_16(*r_dst)));
