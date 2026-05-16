@@ -80,7 +80,7 @@ static const m68k_register_t g_reg_ids[SST_NUM_REGS] = {
 /* ------------------------------------------------------------------ */
 /* Per-file result tracking                                           */
 /* ------------------------------------------------------------------ */
-#define MAX_FAILS_DETAIL 10
+#define MAX_FAILS_DETAIL 4000
 
 typedef struct {
     char detail[256];
@@ -99,6 +99,8 @@ typedef struct {
     int cycle_checked;     /* vectors with expected_cycles > 0 */
     int cycle_match;       /* expected == actual */
     int cycle_mismatch;    /* expected != actual */
+    int cycle_mismatch_aerr; /* mismatches where actual == AERR cycles (50) */
+    int cycle_mismatch_non_aerr; /* mismatches where actual != 50 */
     int cycle_min_delta;   /* smallest (actual - expected) for mismatches */
     int cycle_max_delta;   /* largest (actual - expected) for mismatches */
     char cycle_sample_name[64]; /* name of first cycle mismatch */
@@ -109,6 +111,10 @@ typedef struct {
 #define MAX_FILE_RESULTS 300
 static file_result_t g_results[MAX_FILE_RESULTS];
 static int g_num_results = 0;
+
+/* Global flags for cycle filtering */
+static int g_aerr_only = 0;
+static int g_no_aerr = 0;
 
 /* Configuration: Blacklist specific raddad tests that conflict with verified 
  * tomharte Address Error semantics.
@@ -247,7 +253,10 @@ static int run_vector(const sst_vector_t *vec, file_result_t *res,
         if (actual_cycles == (int)vec->expected_cycles) {
             res->cycle_match++;
         } else {
+            int is_aerr = (actual_cycles == 50);  /* AERR exception flat cost */
             res->cycle_mismatch++;
+            if (is_aerr) res->cycle_mismatch_aerr++;
+            else         res->cycle_mismatch_non_aerr++;
             int delta = actual_cycles - (int)vec->expected_cycles;
             if (res->cycle_mismatch == 1 || delta < res->cycle_min_delta)
                 res->cycle_min_delta = delta;
@@ -259,10 +268,20 @@ static int run_vector(const sst_vector_t *vec, file_result_t *res,
                 res->cycle_sample_expected = vec->expected_cycles;
                 res->cycle_sample_actual = actual_cycles;
             }
-            if (verbose && res->cycle_mismatch <= MAX_FAILS_DETAIL) {
-                printf("    CYCLE %s [%s]: exp=%d got=%d (delta=%+d)\n",
+            /* Filter: --aerr-only shows only got=50 mismatches,
+             * --no-aerr shows only got!=50 mismatches */
+            int show_cycle = 1;
+            if (g_aerr_only && !is_aerr) show_cycle = 0;
+            if (g_no_aerr && is_aerr) show_cycle = 0;
+            if (verbose && show_cycle && res->cycle_mismatch <= MAX_FAILS_DETAIL) {
+                printf("    CYCLE %s [%s]: exp=%d got=%d (delta=%+d)%s  regs=%04X,%04X,%04X,%04X,%04X,%04X,%04X,%04X\n",
                        vec->name, res->mnemonic,
-                       vec->expected_cycles, actual_cycles, delta);
+                       vec->expected_cycles, actual_cycles, delta,
+                       is_aerr ? " [AERR]" : "",
+                       vec->initial.regs[0]&0xffff, vec->initial.regs[1]&0xffff,
+                       vec->initial.regs[2]&0xffff, vec->initial.regs[3]&0xffff,
+                       vec->initial.regs[4]&0xffff, vec->initial.regs[5]&0xffff,
+                       vec->initial.regs[6]&0xffff, vec->initial.regs[7]&0xffff);
             }
         }
     }
@@ -502,10 +521,13 @@ static void print_summary(int check_cycles) {
 
     if (check_cycles) {
         int total_checked = 0, total_match = 0, total_mismatch = 0;
+        int total_aerr = 0, total_non_aerr = 0;
         for (int i = 0; i < g_num_results; i++) {
             total_checked += g_results[i].cycle_checked;
             total_match += g_results[i].cycle_match;
             total_mismatch += g_results[i].cycle_mismatch;
+            total_aerr += g_results[i].cycle_mismatch_aerr;
+            total_non_aerr += g_results[i].cycle_mismatch_non_aerr;
         }
         printf("\n=== Cycle Verification ===\n");
         printf("Checked: %d vectors\n", total_checked);
@@ -514,15 +536,31 @@ static void print_summary(int check_cycles) {
         printf("Mismatch: %d (%.1f%%)\n", total_mismatch,
                total_checked > 0 ? 100.0 * total_mismatch / total_checked : 0.0);
         if (total_mismatch > 0) {
+            printf("  AERR (got=50):  %d (%.1f%% of mismatches)\n", total_aerr,
+                   total_mismatch > 0 ? 100.0 * total_aerr / total_mismatch : 0.0);
+            printf("  Non-AERR:       %d (%.1f%% of mismatches)\n", total_non_aerr,
+                   total_mismatch > 0 ? 100.0 * total_non_aerr / total_mismatch : 0.0);
+        }
+        if (total_mismatch > 0) {
             printf("\nMismatched instructions:\n");
             for (int i = 0; i < g_num_results; i++) {
                 if (g_results[i].cycle_mismatch > 0) {
-                    printf("  %-10s %-20s %d/%d mismatch (%s exp=%d got=%d)\n",
-                           g_results[i].source, g_results[i].mnemonic,
-                           g_results[i].cycle_mismatch, g_results[i].cycle_checked,
-                           g_results[i].cycle_sample_name,
-                           g_results[i].cycle_sample_expected,
-                           g_results[i].cycle_sample_actual);
+                    int show = 1;
+                    if (g_aerr_only && g_results[i].cycle_mismatch_aerr == 0) show = 0;
+                    if (g_no_aerr && g_results[i].cycle_mismatch_non_aerr == 0) show = 0;
+                    if (show) {
+                        printf("  %-10s %-20s %d/%d mismatch",
+                               g_results[i].source, g_results[i].mnemonic,
+                               g_results[i].cycle_mismatch, g_results[i].cycle_checked);
+                        if (g_results[i].cycle_mismatch_aerr > 0 || g_results[i].cycle_mismatch_non_aerr > 0)
+                            printf(" (AERR:%d non-AERR:%d)",
+                                   g_results[i].cycle_mismatch_aerr,
+                                   g_results[i].cycle_mismatch_non_aerr);
+                        printf(" (%s exp=%d got=%d)\n",
+                               g_results[i].cycle_sample_name,
+                               g_results[i].cycle_sample_expected,
+                               g_results[i].cycle_sample_actual);
+                    }
                 }
             }
         }
@@ -742,6 +780,8 @@ static void usage(void) {
            "  --stop-on-fail      Stop at first failure\n"
            "  --verbose           Print each failure\n"
            "  --cycles            Verify cycle counts against reference data\n"
+                      "  --aerr-only         Cycle check: only report AERR mismatches (got=50)\n"
+                      "  --no-aerr           Cycle check: only report non-AERR mismatches (got!=50)\n"
            "  --summary           Print summary\n"
            "  --report-json=PATH  Write JSON report\n"
            "  --report-yaml=PATH  Write YAML report\n"
@@ -755,6 +795,7 @@ static void usage(void) {
 int main(int argc, char **argv) {
     int do_all = 0, verbose = 0, summary = 0, stop_on_fail = 0;
     int check_cycles = 0;
+    int aerr_only = 0, no_aerr = 0;
     int max_vectors = 0;
     const char *source_filter = NULL;
     const char *data_dir = "test/singlestep/unified";
@@ -770,6 +811,8 @@ int main(int argc, char **argv) {
         else if (strcmp(argv[i], "--summary") == 0) summary = 1;
         else if (strcmp(argv[i], "--stop-on-fail") == 0) stop_on_fail = 1;
         else if (strcmp(argv[i], "--cycles") == 0) check_cycles = 1;
+        else if (strcmp(argv[i], "--aerr-only") == 0) aerr_only = 1;
+        else if (strcmp(argv[i], "--no-aerr") == 0) no_aerr = 1;
         else if (strncmp(argv[i], "--source=", 9) == 0) source_filter = argv[i] + 9;
         else if (strncmp(argv[i], "--data-dir=", 11) == 0) data_dir = argv[i] + 11;
         else if (strncmp(argv[i], "--max-vectors=", 14) == 0) max_vectors = atoi(argv[i] + 14);
@@ -793,6 +836,10 @@ int main(int argc, char **argv) {
         usage();
         return 1;
     }
+
+    /* Propagate AERR filter flags to globals (used by run_vector) */
+    g_aerr_only = aerr_only;
+    g_no_aerr = no_aerr;
 
     /* Init Musashi once */
     m68k_init();
