@@ -5050,7 +5050,11 @@ static void m68k_op_ble_32(void)
 static void m68k_op_bchg_32_r_d(void)
 {
 	uint* r_dst = &DY;
-	uint mask = 1 << (DX & 0x1f);
+	uint bit = DX & 0x1f;
+	uint mask = 1 << bit;
+
+	if(bit >= 16)
+		USE_CYCLES(2);
 
 	FLAG_Z = *r_dst & mask;
 	*r_dst ^= mask;
@@ -5159,7 +5163,11 @@ static void m68k_op_bchg_8_r_al(void)
 static void m68k_op_bchg_32_s_d(void)
 {
 	uint* r_dst = &DY;
-	uint mask = 1 << (OPER_I_8() & 0x1f);
+	uint bit = OPER_I_8() & 0x1f;
+	uint mask = 1 << bit;
+
+	if(bit >= 16)
+		USE_CYCLES(2);
 
 	FLAG_Z = *r_dst & mask;
 	*r_dst ^= mask;
@@ -5268,7 +5276,11 @@ static void m68k_op_bchg_8_s_al(void)
 static void m68k_op_bclr_32_r_d(void)
 {
 	uint* r_dst = &DY;
-	uint mask = 1 << (DX & 0x1f);
+	uint bit = DX & 0x1f;
+	uint mask = 1 << bit;
+
+	if(bit >= 16)
+		USE_CYCLES(2);
 
 	FLAG_Z = *r_dst & mask;
 	*r_dst &= ~mask;
@@ -5377,7 +5389,11 @@ static void m68k_op_bclr_8_r_al(void)
 static void m68k_op_bclr_32_s_d(void)
 {
 	uint* r_dst = &DY;
-	uint mask = 1 << (OPER_I_8() & 0x1f);
+	uint bit = OPER_I_8() & 0x1f;
+	uint mask = 1 << bit;
+
+	if(bit >= 16)
+		USE_CYCLES(2);
 
 	FLAG_Z = *r_dst & mask;
 	*r_dst &= ~mask;
@@ -8004,7 +8020,11 @@ static void m68k_op_bra_32(void)
 static void m68k_op_bset_32_r_d(void)
 {
 	uint* r_dst = &DY;
-	uint mask = 1 << (DX & 0x1f);
+	uint bit = DX & 0x1f;
+	uint mask = 1 << bit;
+
+	if(bit >= 16)
+		USE_CYCLES(2);
 
 	FLAG_Z = *r_dst & mask;
 	*r_dst |= mask;
@@ -8113,7 +8133,11 @@ static void m68k_op_bset_8_r_al(void)
 static void m68k_op_bset_32_s_d(void)
 {
 	uint* r_dst = &DY;
-	uint mask = 1 << (OPER_I_8() & 0x1f);
+	uint bit = OPER_I_8() & 0x1f;
+	uint mask = 1 << bit;
+
+	if(bit >= 16)
+		USE_CYCLES(2);
 
 	FLAG_Z = *r_dst & mask;
 	*r_dst |= mask;
@@ -12842,6 +12866,13 @@ static void m68k_op_divs_16_d(void)
 
 		if(quotient == MAKE_INT_16(quotient))
 		{
+			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+				uint c = 0;
+				uint q = (quotient < 0) ? -quotient : quotient;
+				for (; q; q >>= 1)
+					if (q & 1) c += 2;
+				USE_CYCLES(c);
+			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
 			FLAG_V = VFLAG_CLEAR;
@@ -12849,16 +12880,18 @@ static void m68k_op_divs_16_d(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
+		/* 68000: on overflow, abort early - only 10 cycles total for Dn source */
+		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(-104);
 		FLAG_V = VFLAG_SET;
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-		FLAG_C = CFLAG_CLEAR;
-		FLAG_V = VFLAG_CLEAR;
-		FLAG_Z = ZFLAG_CLEAR;
-		FLAG_N = NFLAG_CLEAR;
-		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
+	FLAG_C = CFLAG_CLEAR;
+	FLAG_V = VFLAG_CLEAR;
+	FLAG_Z = ZFLAG_CLEAR;
+	FLAG_N = NFLAG_CLEAR;
+	m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
@@ -12886,6 +12919,13 @@ static void m68k_op_divs_16_ai(void)
 
 		if(quotient == MAKE_INT_16(quotient))
 		{
+			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+				uint c = 0;
+				uint q = (quotient < 0) ? -quotient : quotient;
+				for (; q; q >>= 1)
+					if (q & 1) c += 2;
+				USE_CYCLES(c);
+			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
 			FLAG_V = VFLAG_CLEAR;
@@ -12893,16 +12933,18 @@ static void m68k_op_divs_16_ai(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
+		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(-104);
 		FLAG_V = VFLAG_SET;
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-		FLAG_C = CFLAG_CLEAR;
-		FLAG_V = VFLAG_CLEAR;
-		FLAG_Z = ZFLAG_CLEAR;
-		FLAG_N = NFLAG_CLEAR;
-		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
+	FLAG_C = CFLAG_CLEAR;
+	FLAG_V = VFLAG_CLEAR;
+	FLAG_Z = ZFLAG_CLEAR;
+	FLAG_N = NFLAG_CLEAR;
+	m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
@@ -12930,6 +12972,13 @@ static void m68k_op_divs_16_pi(void)
 
 		if(quotient == MAKE_INT_16(quotient))
 		{
+			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+				uint c = 0;
+				uint q = (quotient < 0) ? -quotient : quotient;
+				for (; q; q >>= 1)
+					if (q & 1) c += 2;
+				USE_CYCLES(c);
+			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
 			FLAG_V = VFLAG_CLEAR;
@@ -12937,16 +12986,18 @@ static void m68k_op_divs_16_pi(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
+		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(-104);
 		FLAG_V = VFLAG_SET;
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-		FLAG_C = CFLAG_CLEAR;
-		FLAG_V = VFLAG_CLEAR;
-		FLAG_Z = ZFLAG_CLEAR;
-		FLAG_N = NFLAG_CLEAR;
-		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
+	FLAG_C = CFLAG_CLEAR;
+	FLAG_V = VFLAG_CLEAR;
+	FLAG_Z = ZFLAG_CLEAR;
+	FLAG_N = NFLAG_CLEAR;
+	m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
@@ -12974,6 +13025,13 @@ static void m68k_op_divs_16_pd(void)
 
 		if(quotient == MAKE_INT_16(quotient))
 		{
+			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+				uint c = 0;
+				uint q = (quotient < 0) ? -quotient : quotient;
+				for (; q; q >>= 1)
+					if (q & 1) c += 2;
+				USE_CYCLES(c);
+			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
 			FLAG_V = VFLAG_CLEAR;
@@ -12981,16 +13039,18 @@ static void m68k_op_divs_16_pd(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
+		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(-104);
 		FLAG_V = VFLAG_SET;
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-		FLAG_C = CFLAG_CLEAR;
-		FLAG_V = VFLAG_CLEAR;
-		FLAG_Z = ZFLAG_CLEAR;
-		FLAG_N = NFLAG_CLEAR;
-		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
+	FLAG_C = CFLAG_CLEAR;
+	FLAG_V = VFLAG_CLEAR;
+	FLAG_Z = ZFLAG_CLEAR;
+	FLAG_N = NFLAG_CLEAR;
+	m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
@@ -13018,6 +13078,13 @@ static void m68k_op_divs_16_di(void)
 
 		if(quotient == MAKE_INT_16(quotient))
 		{
+			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+				uint c = 0;
+				uint q = (quotient < 0) ? -quotient : quotient;
+				for (; q; q >>= 1)
+					if (q & 1) c += 2;
+				USE_CYCLES(c);
+			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
 			FLAG_V = VFLAG_CLEAR;
@@ -13025,16 +13092,18 @@ static void m68k_op_divs_16_di(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
+		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(-104);
 		FLAG_V = VFLAG_SET;
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-		FLAG_C = CFLAG_CLEAR;
-		FLAG_V = VFLAG_CLEAR;
-		FLAG_Z = ZFLAG_CLEAR;
-		FLAG_N = NFLAG_CLEAR;
-		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
+	FLAG_C = CFLAG_CLEAR;
+	FLAG_V = VFLAG_CLEAR;
+	FLAG_Z = ZFLAG_CLEAR;
+	FLAG_N = NFLAG_CLEAR;
+	m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
@@ -13062,6 +13131,13 @@ static void m68k_op_divs_16_ix(void)
 
 		if(quotient == MAKE_INT_16(quotient))
 		{
+			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+				uint c = 0;
+				uint q = (quotient < 0) ? -quotient : quotient;
+				for (; q; q >>= 1)
+					if (q & 1) c += 2;
+				USE_CYCLES(c);
+			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
 			FLAG_V = VFLAG_CLEAR;
@@ -13069,16 +13145,18 @@ static void m68k_op_divs_16_ix(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
+		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(-104);
 		FLAG_V = VFLAG_SET;
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-		FLAG_C = CFLAG_CLEAR;
-		FLAG_V = VFLAG_CLEAR;
-		FLAG_Z = ZFLAG_CLEAR;
-		FLAG_N = NFLAG_CLEAR;
-		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
+	FLAG_C = CFLAG_CLEAR;
+	FLAG_V = VFLAG_CLEAR;
+	FLAG_Z = ZFLAG_CLEAR;
+	FLAG_N = NFLAG_CLEAR;
+	m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
@@ -13106,6 +13184,13 @@ static void m68k_op_divs_16_aw(void)
 
 		if(quotient == MAKE_INT_16(quotient))
 		{
+			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+				uint c = 0;
+				uint q = (quotient < 0) ? -quotient : quotient;
+				for (; q; q >>= 1)
+					if (q & 1) c += 2;
+				USE_CYCLES(c);
+			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
 			FLAG_V = VFLAG_CLEAR;
@@ -13113,16 +13198,18 @@ static void m68k_op_divs_16_aw(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
+		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(-104);
 		FLAG_V = VFLAG_SET;
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-		FLAG_C = CFLAG_CLEAR;
-		FLAG_V = VFLAG_CLEAR;
-		FLAG_Z = ZFLAG_CLEAR;
-		FLAG_N = NFLAG_CLEAR;
-		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
+	FLAG_C = CFLAG_CLEAR;
+	FLAG_V = VFLAG_CLEAR;
+	FLAG_Z = ZFLAG_CLEAR;
+	FLAG_N = NFLAG_CLEAR;
+	m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
@@ -13150,6 +13237,13 @@ static void m68k_op_divs_16_al(void)
 
 		if(quotient == MAKE_INT_16(quotient))
 		{
+			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+				uint c = 0;
+				uint q = (quotient < 0) ? -quotient : quotient;
+				for (; q; q >>= 1)
+					if (q & 1) c += 2;
+				USE_CYCLES(c);
+			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
 			FLAG_V = VFLAG_CLEAR;
@@ -13157,16 +13251,18 @@ static void m68k_op_divs_16_al(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
+		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(-104);
 		FLAG_V = VFLAG_SET;
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-		FLAG_C = CFLAG_CLEAR;
-		FLAG_V = VFLAG_CLEAR;
-		FLAG_Z = ZFLAG_CLEAR;
-		FLAG_N = NFLAG_CLEAR;
-		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
+	FLAG_C = CFLAG_CLEAR;
+	FLAG_V = VFLAG_CLEAR;
+	FLAG_Z = ZFLAG_CLEAR;
+	FLAG_N = NFLAG_CLEAR;
+	m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
@@ -13194,6 +13290,13 @@ static void m68k_op_divs_16_pcdi(void)
 
 		if(quotient == MAKE_INT_16(quotient))
 		{
+			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+				uint c = 0;
+				uint q = (quotient < 0) ? -quotient : quotient;
+				for (; q; q >>= 1)
+					if (q & 1) c += 2;
+				USE_CYCLES(c);
+			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
 			FLAG_V = VFLAG_CLEAR;
@@ -13201,16 +13304,18 @@ static void m68k_op_divs_16_pcdi(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
+		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(-104);
 		FLAG_V = VFLAG_SET;
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-		FLAG_C = CFLAG_CLEAR;
-		FLAG_V = VFLAG_CLEAR;
-		FLAG_Z = ZFLAG_CLEAR;
-		FLAG_N = NFLAG_CLEAR;
-		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
+	FLAG_C = CFLAG_CLEAR;
+	FLAG_V = VFLAG_CLEAR;
+	FLAG_Z = ZFLAG_CLEAR;
+	FLAG_N = NFLAG_CLEAR;
+	m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
@@ -13238,6 +13343,13 @@ static void m68k_op_divs_16_pcix(void)
 
 		if(quotient == MAKE_INT_16(quotient))
 		{
+			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+				uint c = 0;
+				uint q = (quotient < 0) ? -quotient : quotient;
+				for (; q; q >>= 1)
+					if (q & 1) c += 2;
+				USE_CYCLES(c);
+			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
 			FLAG_V = VFLAG_CLEAR;
@@ -13245,16 +13357,18 @@ static void m68k_op_divs_16_pcix(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
+		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(-104);
 		FLAG_V = VFLAG_SET;
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-		FLAG_C = CFLAG_CLEAR;
-		FLAG_V = VFLAG_CLEAR;
-		FLAG_Z = ZFLAG_CLEAR;
-		FLAG_N = NFLAG_CLEAR;
-		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
+	FLAG_C = CFLAG_CLEAR;
+	FLAG_V = VFLAG_CLEAR;
+	FLAG_Z = ZFLAG_CLEAR;
+	FLAG_N = NFLAG_CLEAR;
+	m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
@@ -13282,6 +13396,13 @@ static void m68k_op_divs_16_i(void)
 
 		if(quotient == MAKE_INT_16(quotient))
 		{
+			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+				uint c = 0;
+				uint q = (quotient < 0) ? -quotient : quotient;
+				for (; q; q >>= 1)
+					if (q & 1) c += 2;
+				USE_CYCLES(c);
+			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
 			FLAG_V = VFLAG_CLEAR;
@@ -13289,16 +13410,18 @@ static void m68k_op_divs_16_i(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
+		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(-104);
 		FLAG_V = VFLAG_SET;
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-		FLAG_C = CFLAG_CLEAR;
-		FLAG_V = VFLAG_CLEAR;
-		FLAG_Z = ZFLAG_CLEAR;
-		FLAG_N = NFLAG_CLEAR;
-		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
+	FLAG_C = CFLAG_CLEAR;
+	FLAG_V = VFLAG_CLEAR;
+	FLAG_Z = ZFLAG_CLEAR;
+	FLAG_N = NFLAG_CLEAR;
+	m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
@@ -13314,6 +13437,12 @@ static void m68k_op_divu_16_d(void)
 
 		if(quotient < 0x10000)
 		{
+			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+				uint c = 0;
+				for (uint q = quotient; q; q >>= 1)
+					if (q & 1) c += 2;
+				USE_CYCLES(c);
+			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
 			FLAG_V = VFLAG_CLEAR;
@@ -13321,16 +13450,18 @@ static void m68k_op_divu_16_d(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
+		/* 68000: on overflow, abort early - only 10 cycles total for Dn source */
+		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(-98);
 		FLAG_V = VFLAG_SET;
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-		FLAG_C = CFLAG_CLEAR;
-		FLAG_V = VFLAG_CLEAR;
-		FLAG_Z = ZFLAG_CLEAR;
-		FLAG_N = NFLAG_CLEAR;
-		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
+	FLAG_C = CFLAG_CLEAR;
+	FLAG_V = VFLAG_CLEAR;
+	FLAG_Z = ZFLAG_CLEAR;
+	FLAG_N = NFLAG_CLEAR;
+	m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
@@ -13346,6 +13477,12 @@ static void m68k_op_divu_16_ai(void)
 
 		if(quotient < 0x10000)
 		{
+			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+				uint c = 0;
+				for (uint q = quotient; q; q >>= 1)
+					if (q & 1) c += 2;
+				USE_CYCLES(c);
+			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
 			FLAG_V = VFLAG_CLEAR;
@@ -13353,16 +13490,18 @@ static void m68k_op_divu_16_ai(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
+		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(-98);
 		FLAG_V = VFLAG_SET;
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-		FLAG_C = CFLAG_CLEAR;
-		FLAG_V = VFLAG_CLEAR;
-		FLAG_Z = ZFLAG_CLEAR;
-		FLAG_N = NFLAG_CLEAR;
-		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
+	FLAG_C = CFLAG_CLEAR;
+	FLAG_V = VFLAG_CLEAR;
+	FLAG_Z = ZFLAG_CLEAR;
+	FLAG_N = NFLAG_CLEAR;
+	m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
@@ -13378,6 +13517,12 @@ static void m68k_op_divu_16_pi(void)
 
 		if(quotient < 0x10000)
 		{
+			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+				uint c = 0;
+				for (uint q = quotient; q; q >>= 1)
+					if (q & 1) c += 2;
+				USE_CYCLES(c);
+			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
 			FLAG_V = VFLAG_CLEAR;
@@ -13385,16 +13530,18 @@ static void m68k_op_divu_16_pi(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
+		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(-98);
 		FLAG_V = VFLAG_SET;
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-		FLAG_C = CFLAG_CLEAR;
-		FLAG_V = VFLAG_CLEAR;
-		FLAG_Z = ZFLAG_CLEAR;
-		FLAG_N = NFLAG_CLEAR;
-		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
+	FLAG_C = CFLAG_CLEAR;
+	FLAG_V = VFLAG_CLEAR;
+	FLAG_Z = ZFLAG_CLEAR;
+	FLAG_N = NFLAG_CLEAR;
+	m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
@@ -13410,6 +13557,12 @@ static void m68k_op_divu_16_pd(void)
 
 		if(quotient < 0x10000)
 		{
+			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+				uint c = 0;
+				for (uint q = quotient; q; q >>= 1)
+					if (q & 1) c += 2;
+				USE_CYCLES(c);
+			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
 			FLAG_V = VFLAG_CLEAR;
@@ -13417,16 +13570,18 @@ static void m68k_op_divu_16_pd(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
+		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(-98);
 		FLAG_V = VFLAG_SET;
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-		FLAG_C = CFLAG_CLEAR;
-		FLAG_V = VFLAG_CLEAR;
-		FLAG_Z = ZFLAG_CLEAR;
-		FLAG_N = NFLAG_CLEAR;
-		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
+	FLAG_C = CFLAG_CLEAR;
+	FLAG_V = VFLAG_CLEAR;
+	FLAG_Z = ZFLAG_CLEAR;
+	FLAG_N = NFLAG_CLEAR;
+	m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
@@ -13442,6 +13597,12 @@ static void m68k_op_divu_16_di(void)
 
 		if(quotient < 0x10000)
 		{
+			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+				uint c = 0;
+				for (uint q = quotient; q; q >>= 1)
+					if (q & 1) c += 2;
+				USE_CYCLES(c);
+			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
 			FLAG_V = VFLAG_CLEAR;
@@ -13449,16 +13610,18 @@ static void m68k_op_divu_16_di(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
+		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(-98);
 		FLAG_V = VFLAG_SET;
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-		FLAG_C = CFLAG_CLEAR;
-		FLAG_V = VFLAG_CLEAR;
-		FLAG_Z = ZFLAG_CLEAR;
-		FLAG_N = NFLAG_CLEAR;
-		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
+	FLAG_C = CFLAG_CLEAR;
+	FLAG_V = VFLAG_CLEAR;
+	FLAG_Z = ZFLAG_CLEAR;
+	FLAG_N = NFLAG_CLEAR;
+	m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
@@ -13474,6 +13637,12 @@ static void m68k_op_divu_16_ix(void)
 
 		if(quotient < 0x10000)
 		{
+			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+				uint c = 0;
+				for (uint q = quotient; q; q >>= 1)
+					if (q & 1) c += 2;
+				USE_CYCLES(c);
+			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
 			FLAG_V = VFLAG_CLEAR;
@@ -13481,16 +13650,18 @@ static void m68k_op_divu_16_ix(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
+		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(-98);
 		FLAG_V = VFLAG_SET;
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-		FLAG_C = CFLAG_CLEAR;
-		FLAG_V = VFLAG_CLEAR;
-		FLAG_Z = ZFLAG_CLEAR;
-		FLAG_N = NFLAG_CLEAR;
-		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
+	FLAG_C = CFLAG_CLEAR;
+	FLAG_V = VFLAG_CLEAR;
+	FLAG_Z = ZFLAG_CLEAR;
+	FLAG_N = NFLAG_CLEAR;
+	m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
@@ -13506,6 +13677,12 @@ static void m68k_op_divu_16_aw(void)
 
 		if(quotient < 0x10000)
 		{
+			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+				uint c = 0;
+				for (uint q = quotient; q; q >>= 1)
+					if (q & 1) c += 2;
+				USE_CYCLES(c);
+			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
 			FLAG_V = VFLAG_CLEAR;
@@ -13513,16 +13690,18 @@ static void m68k_op_divu_16_aw(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
+		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(-98);
 		FLAG_V = VFLAG_SET;
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-		FLAG_C = CFLAG_CLEAR;
-		FLAG_V = VFLAG_CLEAR;
-		FLAG_Z = ZFLAG_CLEAR;
-		FLAG_N = NFLAG_CLEAR;
-		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
+	FLAG_C = CFLAG_CLEAR;
+	FLAG_V = VFLAG_CLEAR;
+	FLAG_Z = ZFLAG_CLEAR;
+	FLAG_N = NFLAG_CLEAR;
+	m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
@@ -13538,6 +13717,12 @@ static void m68k_op_divu_16_al(void)
 
 		if(quotient < 0x10000)
 		{
+			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+				uint c = 0;
+				for (uint q = quotient; q; q >>= 1)
+					if (q & 1) c += 2;
+				USE_CYCLES(c);
+			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
 			FLAG_V = VFLAG_CLEAR;
@@ -13545,16 +13730,18 @@ static void m68k_op_divu_16_al(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
+		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(-98);
 		FLAG_V = VFLAG_SET;
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-		FLAG_C = CFLAG_CLEAR;
-		FLAG_V = VFLAG_CLEAR;
-		FLAG_Z = ZFLAG_CLEAR;
-		FLAG_N = NFLAG_CLEAR;
-		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
+	FLAG_C = CFLAG_CLEAR;
+	FLAG_V = VFLAG_CLEAR;
+	FLAG_Z = ZFLAG_CLEAR;
+	FLAG_N = NFLAG_CLEAR;
+	m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
@@ -13570,6 +13757,12 @@ static void m68k_op_divu_16_pcdi(void)
 
 		if(quotient < 0x10000)
 		{
+			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+				uint c = 0;
+				for (uint q = quotient; q; q >>= 1)
+					if (q & 1) c += 2;
+				USE_CYCLES(c);
+			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
 			FLAG_V = VFLAG_CLEAR;
@@ -13577,16 +13770,18 @@ static void m68k_op_divu_16_pcdi(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
+		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(-98);
 		FLAG_V = VFLAG_SET;
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-		FLAG_C = CFLAG_CLEAR;
-		FLAG_V = VFLAG_CLEAR;
-		FLAG_Z = ZFLAG_CLEAR;
-		FLAG_N = NFLAG_CLEAR;
-		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
+	FLAG_C = CFLAG_CLEAR;
+	FLAG_V = VFLAG_CLEAR;
+	FLAG_Z = ZFLAG_CLEAR;
+	FLAG_N = NFLAG_CLEAR;
+	m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
@@ -13602,6 +13797,12 @@ static void m68k_op_divu_16_pcix(void)
 
 		if(quotient < 0x10000)
 		{
+			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+				uint c = 0;
+				for (uint q = quotient; q; q >>= 1)
+					if (q & 1) c += 2;
+				USE_CYCLES(c);
+			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
 			FLAG_V = VFLAG_CLEAR;
@@ -13609,16 +13810,18 @@ static void m68k_op_divu_16_pcix(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
+		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(-98);
 		FLAG_V = VFLAG_SET;
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-		FLAG_C = CFLAG_CLEAR;
-		FLAG_V = VFLAG_CLEAR;
-		FLAG_Z = ZFLAG_CLEAR;
-		FLAG_N = NFLAG_CLEAR;
-		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
+	FLAG_C = CFLAG_CLEAR;
+	FLAG_V = VFLAG_CLEAR;
+	FLAG_Z = ZFLAG_CLEAR;
+	FLAG_N = NFLAG_CLEAR;
+	m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
@@ -13634,6 +13837,12 @@ static void m68k_op_divu_16_i(void)
 
 		if(quotient < 0x10000)
 		{
+			if(CPU_TYPE_IS_010_LESS(CPU_TYPE)) {
+				uint c = 0;
+				for (uint q = quotient; q; q >>= 1)
+					if (q & 1) c += 2;
+				USE_CYCLES(c);
+			}
 			FLAG_Z = quotient;
 			FLAG_N = NFLAG_16(quotient);
 			FLAG_V = VFLAG_CLEAR;
@@ -13641,16 +13850,18 @@ static void m68k_op_divu_16_i(void)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
+		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(-98);
 		FLAG_V = VFLAG_SET;
 		FLAG_C = CFLAG_CLEAR;
 		return;
 	}
-		FLAG_C = CFLAG_CLEAR;
-		FLAG_V = VFLAG_CLEAR;
-		FLAG_Z = ZFLAG_CLEAR;
-		FLAG_N = NFLAG_CLEAR;
-		m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
+	FLAG_C = CFLAG_CLEAR;
+	FLAG_V = VFLAG_CLEAR;
+	FLAG_Z = ZFLAG_CLEAR;
+	FLAG_N = NFLAG_CLEAR;
+	m68ki_exception_trap_pc(EXCEPTION_ZERO_DIVIDE, REG_PPC);
 }
 
 
@@ -36155,21 +36366,21 @@ static const opcode_handler_struct m68k_opcode_handler_table[] =
 	{m68k_op_btst_8_r_pd         , 0xf1f8, 0x0120, { 10,  10,   9,   9,   9}},
 	{m68k_op_btst_8_r_di         , 0xf1f8, 0x0128, { 12,  12,   9,   9,   9}},
 	{m68k_op_btst_8_r_ix         , 0xf1f8, 0x0130, { 14,  14,  11,  11,  11}},
-	{m68k_op_bchg_32_r_d         , 0xf1f8, 0x0140, {  8,   8,   4,   4,   4}},
+	{m68k_op_bchg_32_r_d         , 0xf1f8, 0x0140, {  6,   8,   4,   4,   4}},
 	{m68k_op_movep_32_er         , 0xf1f8, 0x0148, { 24,  24,  18,  18,  18}},
 	{m68k_op_bchg_8_r_ai         , 0xf1f8, 0x0150, { 12,  12,   8,   8,   8}},
 	{m68k_op_bchg_8_r_pi         , 0xf1f8, 0x0158, { 12,  12,   8,   8,   8}},
 	{m68k_op_bchg_8_r_pd         , 0xf1f8, 0x0160, { 14,  14,   9,   9,   9}},
 	{m68k_op_bchg_8_r_di         , 0xf1f8, 0x0168, { 16,  16,   9,   9,   9}},
 	{m68k_op_bchg_8_r_ix         , 0xf1f8, 0x0170, { 18,  18,  11,  11,  11}},
-	{m68k_op_bclr_32_r_d         , 0xf1f8, 0x0180, { 10,  10,   4,   4,   4}},
+	{m68k_op_bclr_32_r_d         , 0xf1f8, 0x0180, {  8,  10,   4,   4,   4}},
 	{m68k_op_movep_16_re         , 0xf1f8, 0x0188, { 16,  16,  11,  11,  11}},
 	{m68k_op_bclr_8_r_ai         , 0xf1f8, 0x0190, { 12,  14,   8,   8,   8}},
 	{m68k_op_bclr_8_r_pi         , 0xf1f8, 0x0198, { 12,  14,   8,   8,   8}},
 	{m68k_op_bclr_8_r_pd         , 0xf1f8, 0x01a0, { 14,  16,   9,   9,   9}},
 	{m68k_op_bclr_8_r_di         , 0xf1f8, 0x01a8, { 16,  18,   9,   9,   9}},
 	{m68k_op_bclr_8_r_ix         , 0xf1f8, 0x01b0, { 18,  20,  11,  11,  11}},
-	{m68k_op_bset_32_r_d         , 0xf1f8, 0x01c0, {  8,   8,   4,   4,   4}},
+	{m68k_op_bset_32_r_d         , 0xf1f8, 0x01c0, {  6,   8,   4,   4,   4}},
 	{m68k_op_movep_32_re         , 0xf1f8, 0x01c8, { 24,  24,  17,  17,  17}},
 	{m68k_op_bset_8_r_ai         , 0xf1f8, 0x01d0, { 12,  12,   8,   8,   8}},
 	{m68k_op_bset_8_r_pi         , 0xf1f8, 0x01d8, { 12,  12,   8,   8,   8}},
@@ -36383,12 +36594,12 @@ static const opcode_handler_struct m68k_opcode_handler_table[] =
 	{m68k_op_or_32_er_pd         , 0xf1f8, 0x80a0, { 16,  16,   7,   7,   7}},
 	{m68k_op_or_32_er_di         , 0xf1f8, 0x80a8, { 18,  18,   7,   7,   7}},
 	{m68k_op_or_32_er_ix         , 0xf1f8, 0x80b0, { 20,  20,   9,   9,   9}},
-	{m68k_op_divu_16_d           , 0xf1f8, 0x80c0, {140, 108,  44,  44,  44}},
-	{m68k_op_divu_16_ai          , 0xf1f8, 0x80d0, {144, 112,  48,  48,  48}},
-	{m68k_op_divu_16_pi          , 0xf1f8, 0x80d8, {144, 112,  48,  48,  48}},
-	{m68k_op_divu_16_pd          , 0xf1f8, 0x80e0, {146, 114,  49,  49,  49}},
-	{m68k_op_divu_16_di          , 0xf1f8, 0x80e8, {148, 116,  49,  49,  49}},
-	{m68k_op_divu_16_ix          , 0xf1f8, 0x80f0, {150, 118,  51,  51,  51}},
+	{m68k_op_divu_16_d           , 0xf1f8, 0x80c0, {108, 108,  44,  44,  44}},
+	{m68k_op_divu_16_ai          , 0xf1f8, 0x80d0, {112, 112,  48,  48,  48}},
+	{m68k_op_divu_16_pi          , 0xf1f8, 0x80d8, {112, 112,  48,  48,  48}},
+	{m68k_op_divu_16_pd          , 0xf1f8, 0x80e0, {114, 114,  49,  49,  49}},
+	{m68k_op_divu_16_di          , 0xf1f8, 0x80e8, {116, 116,  49,  49,  49}},
+	{m68k_op_divu_16_ix          , 0xf1f8, 0x80f0, {118, 118,  51,  51,  51}},
 	{m68k_op_sbcd_8_rr           , 0xf1f8, 0x8100, {  6,   6,   4,   4,   4}},
 	{m68k_op_sbcd_8_mm           , 0xf1f8, 0x8108, { 18,  18,  16,  16,  16}},
 	{m68k_op_or_8_re_ai          , 0xf1f8, 0x8110, { 12,  12,   8,   8,   8}},
@@ -36410,12 +36621,12 @@ static const opcode_handler_struct m68k_opcode_handler_table[] =
 	{m68k_op_or_32_re_pd         , 0xf1f8, 0x81a0, { 22,  22,   9,   9,   9}},
 	{m68k_op_or_32_re_di         , 0xf1f8, 0x81a8, { 24,  24,   9,   9,   9}},
 	{m68k_op_or_32_re_ix         , 0xf1f8, 0x81b0, { 26,  26,  11,  11,  11}},
-	{m68k_op_divs_16_d           , 0xf1f8, 0x81c0, {158, 122,  56,  56,  56}},
-	{m68k_op_divs_16_ai          , 0xf1f8, 0x81d0, {162, 126,  60,  60,  60}},
-	{m68k_op_divs_16_pi          , 0xf1f8, 0x81d8, {162, 126,  60,  60,  60}},
-	{m68k_op_divs_16_pd          , 0xf1f8, 0x81e0, {164, 128,  61,  61,  61}},
-	{m68k_op_divs_16_di          , 0xf1f8, 0x81e8, {166, 130,  61,  61,  61}},
-	{m68k_op_divs_16_ix          , 0xf1f8, 0x81f0, {168, 132,  63,  63,  63}},
+	{m68k_op_divs_16_d           , 0xf1f8, 0x81c0, {120, 122,  56,  56,  56}},
+	{m68k_op_divs_16_ai          , 0xf1f8, 0x81d0, {124, 126,  60,  60,  60}},
+	{m68k_op_divs_16_pi          , 0xf1f8, 0x81d8, {124, 126,  60,  60,  60}},
+	{m68k_op_divs_16_pd          , 0xf1f8, 0x81e0, {126, 128,  61,  61,  61}},
+	{m68k_op_divs_16_di          , 0xf1f8, 0x81e8, {128, 130,  61,  61,  61}},
+	{m68k_op_divs_16_ix          , 0xf1f8, 0x81f0, {130, 132,  63,  63,  63}},
 	{m68k_op_sub_8_er_d          , 0xf1f8, 0x9000, {  4,   4,   2,   2,   2}},
 	{m68k_op_sub_8_er_ai         , 0xf1f8, 0x9010, {  8,   8,   6,   6,   6}},
 	{m68k_op_sub_8_er_pi         , 0xf1f8, 0x9018, {  8,   8,   6,   6,   6}},
@@ -36538,7 +36749,7 @@ static const opcode_handler_struct m68k_opcode_handler_table[] =
 	{m68k_op_and_16_er_pd        , 0xf1f8, 0xc060, { 10,  10,   7,   7,   7}},
 	{m68k_op_and_16_er_di        , 0xf1f8, 0xc068, { 12,  12,   7,   7,   7}},
 	{m68k_op_and_16_er_ix        , 0xf1f8, 0xc070, { 14,  14,   9,   9,   9}},
-	{m68k_op_and_32_er_d         , 0xf1f8, 0xc080, {  6,   6,   2,   2,   2}},
+	{m68k_op_and_32_er_d         , 0xf1f8, 0xc080, {  8,   6,   2,   2,   2}},
 	{m68k_op_and_32_er_ai        , 0xf1f8, 0xc090, { 14,  14,   6,   6,   6}},
 	{m68k_op_and_32_er_pi        , 0xf1f8, 0xc098, { 14,  14,   6,   6,   6}},
 	{m68k_op_and_32_er_pd        , 0xf1f8, 0xc0a0, { 16,  16,   7,   7,   7}},
@@ -36855,17 +37066,17 @@ static const opcode_handler_struct m68k_opcode_handler_table[] =
 	{m68k_op_or_16_er_al         , 0xf1ff, 0x8079, { 16,  16,   6,   6,   6}},
 	{m68k_op_or_16_er_pcdi       , 0xf1ff, 0x807a, { 12,  12,   7,   7,   7}},
 	{m68k_op_or_16_er_pcix       , 0xf1ff, 0x807b, { 14,  14,   9,   9,   9}},
-	{m68k_op_or_16_er_i          , 0xf1ff, 0x807c, { 10,   8,   4,   4,   4}},
+	{m68k_op_or_16_er_i          , 0xf1ff, 0x807c, {  8,   8,   4,   4,   4}},
 	{m68k_op_or_32_er_aw         , 0xf1ff, 0x80b8, { 18,  18,   6,   6,   6}},
 	{m68k_op_or_32_er_al         , 0xf1ff, 0x80b9, { 22,  22,   6,   6,   6}},
 	{m68k_op_or_32_er_pcdi       , 0xf1ff, 0x80ba, { 18,  18,   7,   7,   7}},
 	{m68k_op_or_32_er_pcix       , 0xf1ff, 0x80bb, { 20,  20,   9,   9,   9}},
 	{m68k_op_or_32_er_i          , 0xf1ff, 0x80bc, { 16,  14,   6,   6,   6}},
-	{m68k_op_divu_16_aw          , 0xf1ff, 0x80f8, {148, 116,  48,  48,  48}},
-	{m68k_op_divu_16_al          , 0xf1ff, 0x80f9, {152, 120,  48,  48,  48}},
-	{m68k_op_divu_16_pcdi        , 0xf1ff, 0x80fa, {148, 116,  49,  49,  49}},
-	{m68k_op_divu_16_pcix        , 0xf1ff, 0x80fb, {150, 118,  51,  51,  51}},
-	{m68k_op_divu_16_i           , 0xf1ff, 0x80fc, {144, 112,  46,  46,  46}},
+	{m68k_op_divu_16_aw          , 0xf1ff, 0x80f8, {116, 116,  48,  48,  48}},
+	{m68k_op_divu_16_al          , 0xf1ff, 0x80f9, {120, 120,  48,  48,  48}},
+	{m68k_op_divu_16_pcdi        , 0xf1ff, 0x80fa, {116, 116,  49,  49,  49}},
+	{m68k_op_divu_16_pcix        , 0xf1ff, 0x80fb, {118, 118,  51,  51,  51}},
+	{m68k_op_divu_16_i           , 0xf1ff, 0x80fc, {112, 112,  46,  46,  46}},
 	{m68k_op_sbcd_8_mm_ay7       , 0xf1ff, 0x810f, { 18,  18,  16,  16,  16}},
 	{m68k_op_or_8_re_pi7         , 0xf1ff, 0x811f, { 12,  12,   8,   8,   8}},
 	{m68k_op_or_8_re_pd7         , 0xf1ff, 0x8127, { 14,  14,   9,   9,   9}},
@@ -36877,11 +37088,11 @@ static const opcode_handler_struct m68k_opcode_handler_table[] =
 	{m68k_op_unpk_16_mm_ay7      , 0xf1ff, 0x818f, {  0,   0,  13,  13,  13}},
 	{m68k_op_or_32_re_aw         , 0xf1ff, 0x81b8, { 24,  24,   8,   8,   8}},
 	{m68k_op_or_32_re_al         , 0xf1ff, 0x81b9, { 28,  28,   8,   8,   8}},
-	{m68k_op_divs_16_aw          , 0xf1ff, 0x81f8, {166, 130,  60,  60,  60}},
-	{m68k_op_divs_16_al          , 0xf1ff, 0x81f9, {170, 134,  60,  60,  60}},
-	{m68k_op_divs_16_pcdi        , 0xf1ff, 0x81fa, {166, 130,  61,  61,  61}},
-	{m68k_op_divs_16_pcix        , 0xf1ff, 0x81fb, {168, 132,  63,  63,  63}},
-	{m68k_op_divs_16_i           , 0xf1ff, 0x81fc, {162, 126,  58,  58,  58}},
+	{m68k_op_divs_16_aw          , 0xf1ff, 0x81f8, {128, 130,  60,  60,  60}},
+	{m68k_op_divs_16_al          , 0xf1ff, 0x81f9, {132, 134,  60,  60,  60}},
+	{m68k_op_divs_16_pcdi        , 0xf1ff, 0x81fa, {128, 130,  61,  61,  61}},
+	{m68k_op_divs_16_pcix        , 0xf1ff, 0x81fb, {130, 132,  63,  63,  63}},
+	{m68k_op_divs_16_i           , 0xf1ff, 0x81fc, {124, 126,  58,  58,  58}},
 	{m68k_op_sub_8_er_pi7        , 0xf1ff, 0x901f, {  8,   8,   6,   6,   6}},
 	{m68k_op_sub_8_er_pd7        , 0xf1ff, 0x9027, { 10,  10,   7,   7,   7}},
 	{m68k_op_sub_8_er_aw         , 0xf1ff, 0x9038, { 12,  12,   6,   6,   6}},
@@ -36893,7 +37104,7 @@ static const opcode_handler_struct m68k_opcode_handler_table[] =
 	{m68k_op_sub_16_er_al        , 0xf1ff, 0x9079, { 16,  16,   6,   6,   6}},
 	{m68k_op_sub_16_er_pcdi      , 0xf1ff, 0x907a, { 12,  12,   7,   7,   7}},
 	{m68k_op_sub_16_er_pcix      , 0xf1ff, 0x907b, { 14,  14,   9,   9,   9}},
-	{m68k_op_sub_16_er_i         , 0xf1ff, 0x907c, { 10,   8,   4,   4,   4}},
+	{m68k_op_sub_16_er_i         , 0xf1ff, 0x907c, {  8,   8,   4,   4,   4}},
 	{m68k_op_sub_32_er_aw        , 0xf1ff, 0x90b8, { 18,  18,   6,   6,   6}},
 	{m68k_op_sub_32_er_al        , 0xf1ff, 0x90b9, { 22,  22,   6,   6,   6}},
 	{m68k_op_sub_32_er_pcdi      , 0xf1ff, 0x90ba, { 18,  18,   7,   7,   7}},
@@ -36965,7 +37176,7 @@ static const opcode_handler_struct m68k_opcode_handler_table[] =
 	{m68k_op_and_16_er_al        , 0xf1ff, 0xc079, { 16,  16,   6,   6,   6}},
 	{m68k_op_and_16_er_pcdi      , 0xf1ff, 0xc07a, { 12,  12,   7,   7,   7}},
 	{m68k_op_and_16_er_pcix      , 0xf1ff, 0xc07b, { 14,  14,   9,   9,   9}},
-	{m68k_op_and_16_er_i         , 0xf1ff, 0xc07c, { 10,   8,   4,   4,   4}},
+	{m68k_op_and_16_er_i         , 0xf1ff, 0xc07c, {  8,   8,   4,   4,   4}},
 	{m68k_op_and_32_er_aw        , 0xf1ff, 0xc0b8, { 18,  18,   6,   6,   6}},
 	{m68k_op_and_32_er_al        , 0xf1ff, 0xc0b9, { 22,  22,   6,   6,   6}},
 	{m68k_op_and_32_er_pcdi      , 0xf1ff, 0xc0ba, { 18,  18,   7,   7,   7}},
@@ -37001,7 +37212,7 @@ static const opcode_handler_struct m68k_opcode_handler_table[] =
 	{m68k_op_add_16_er_al        , 0xf1ff, 0xd079, { 16,  16,   6,   6,   6}},
 	{m68k_op_add_16_er_pcdi      , 0xf1ff, 0xd07a, { 12,  12,   7,   7,   7}},
 	{m68k_op_add_16_er_pcix      , 0xf1ff, 0xd07b, { 14,  14,   9,   9,   9}},
-	{m68k_op_add_16_er_i         , 0xf1ff, 0xd07c, { 10,   8,   4,   4,   4}},
+	{m68k_op_add_16_er_i         , 0xf1ff, 0xd07c, {  8,   8,   4,   4,   4}},
 	{m68k_op_add_32_er_aw        , 0xf1ff, 0xd0b8, { 18,  18,   6,   6,   6}},
 	{m68k_op_add_32_er_al        , 0xf1ff, 0xd0b9, { 22,  22,   6,   6,   6}},
 	{m68k_op_add_32_er_pcdi      , 0xf1ff, 0xd0ba, { 18,  18,   7,   7,   7}},
@@ -37059,7 +37270,7 @@ static const opcode_handler_struct m68k_opcode_handler_table[] =
 	{m68k_op_andi_16_pd          , 0xfff8, 0x0260, { 18,  18,   9,   9,   9}},
 	{m68k_op_andi_16_di          , 0xfff8, 0x0268, { 20,  20,   9,   9,   9}},
 	{m68k_op_andi_16_ix          , 0xfff8, 0x0270, { 22,  22,  11,  11,  11}},
-	{m68k_op_andi_32_d           , 0xfff8, 0x0280, { 14,  14,   2,   2,   2}},
+	{m68k_op_andi_32_d           , 0xfff8, 0x0280, { 16,  14,   2,   2,   2}},
 	{m68k_op_andi_32_ai          , 0xfff8, 0x0290, { 28,  28,   8,   8,   8}},
 	{m68k_op_andi_32_pi          , 0xfff8, 0x0298, { 28,  28,   8,   8,   8}},
 	{m68k_op_andi_32_pd          , 0xfff8, 0x02a0, { 30,  30,   9,   9,   9}},
@@ -37116,7 +37327,7 @@ static const opcode_handler_struct m68k_opcode_handler_table[] =
 	{m68k_op_btst_8_s_pd         , 0xfff8, 0x0820, { 14,  14,   9,   9,   9}},
 	{m68k_op_btst_8_s_di         , 0xfff8, 0x0828, { 16,  16,   9,   9,   9}},
 	{m68k_op_btst_8_s_ix         , 0xfff8, 0x0830, { 18,  18,  11,  11,  11}},
-	{m68k_op_bchg_32_s_d         , 0xfff8, 0x0840, { 12,  12,   4,   4,   4}},
+	{m68k_op_bchg_32_s_d         , 0xfff8, 0x0840, { 10,  12,   4,   4,   4}},
 	{m68k_op_bchg_8_s_ai         , 0xfff8, 0x0850, { 16,  16,   8,   8,   8}},
 	{m68k_op_bchg_8_s_pi         , 0xfff8, 0x0858, { 16,  16,   8,   8,   8}},
 	{m68k_op_bchg_8_s_pd         , 0xfff8, 0x0860, { 18,  18,   9,   9,   9}},
@@ -37128,7 +37339,7 @@ static const opcode_handler_struct m68k_opcode_handler_table[] =
 	{m68k_op_bclr_8_s_pd         , 0xfff8, 0x08a0, { 18,  18,   9,   9,   9}},
 	{m68k_op_bclr_8_s_di         , 0xfff8, 0x08a8, { 20,  20,   9,   9,   9}},
 	{m68k_op_bclr_8_s_ix         , 0xfff8, 0x08b0, { 22,  22,  11,  11,  11}},
-	{m68k_op_bset_32_s_d         , 0xfff8, 0x08c0, { 12,  12,   4,   4,   4}},
+	{m68k_op_bset_32_s_d         , 0xfff8, 0x08c0, { 10,  12,   4,   4,   4}},
 	{m68k_op_bset_8_s_ai         , 0xfff8, 0x08d0, { 16,  16,   8,   8,   8}},
 	{m68k_op_bset_8_s_pi         , 0xfff8, 0x08d8, { 16,  16,   8,   8,   8}},
 	{m68k_op_bset_8_s_pd         , 0xfff8, 0x08e0, { 18,  18,   9,   9,   9}},

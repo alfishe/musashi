@@ -3,9 +3,9 @@
 ## 🎯 Current Objective
 Achieve 100% architectural and cycle-accuracy parity with the M68000, as verified by the Tom Harte SingleStepTests (SST).
 
-**Cycle accuracy: 85.8%** (858,169 / 1,000,060 vectors match tomharte cycle counts).
-Remaining ~141,891 mismatches are overwhelmingly AERR-related (got=50 fixed cycle value).
-Non-AERR mismatches reduced to ~10,215 (from ~13,383).
+**Cycle accuracy: 86.2%** (862,330 / 1,000,060 vectors match tomharte cycle counts).
+Remaining ~137,730 mismatches are overwhelmingly AERR-related (got=50 fixed cycle value).
+Non-AERR mismatches reduced to 6,054 (from ~13,383).
 
 ---
 
@@ -92,16 +92,15 @@ Cycle verification infrastructure is live (`sst_runner --cycles`). Current statu
 | Issue | Vectors | Root Cause | Fix Type |
 |-------|---------|------------|----------|
 | DIVU/DIVS | ~14k | No data-dependent cycles (fixed worst-case). Real 68000: 76-140 cycles for DIVU. | Runtime algorithm |
-| AND.l Dn,Dn | ~5k | Base cycles = 6, should be 8. OR.l/EOR.l already correct at 8. | Table fix |
 | BCHG/BCLR/BSET.32 | ~1.9k | Bit-position dependent: +2 cycles when bit >= 16. | Runtime check |
 
 **Priority queue:**
 - [x] **AND.l Dn,Dn base 6→8 + ANDI.l 14→16**: Fixed 676 vectors (2026-05-16)
 - [x] **BCHG/BCLR/BSET.32 bit>=16 +2**: Runtime check for upper word bit ops. Fixed 1,922 vectors (2026-05-16)
-- [~] **DIVU data-dependent cycles (partial)**: Implemented popcount-based formula for normal divisions. Fixed ~500 vectors. Overflow/divzero cases still use worst-case timing. (2026-05-16)
-- [~] **DIVS data-dependent cycles (partial)**: Same popcount formula applied. Fixed ~107 vectors. (2026-05-16)
+- [x] **ADD.w/SUB.w #imm**: Removed incorrect +2 bonus for word-immediate ALU ops. Fixed 107 vectors (2026-05-16)
+- [x] **DIVU data-dependent cycles**: Popcount formula for normal divisions + overflow early-exit (10 cycles base). Fixed 3,644/8,065 cycle matches. (2026-05-16)
+- [x] **DIVS data-dependent cycles**: Same popcount formula + overflow early-exit (16 cycles base). Fixed 2,974/8,065 cycle matches. (2026-05-16)
 - [ ] **CHK remaining non-AERR**: 675 vectors with delta=-2. Complex: same logical scenario (src<0 && bound<0) has different expected values in different vectors. Needs deeper analysis of tomharte data or 68000 microcode paths.
-- [x] **ADD.w/SUB.w #imm**: Removed incorrect +2 bonus for word-immediate ALU ops. Fixed 107 vectors. (2026-05-16)
 
 #### Remaining (Phase 4 — AERR cycle mechanism)
 - [ ] **AERR per-instruction cycle accounting**: ~131,676 remaining mismatches are all `got=50` because

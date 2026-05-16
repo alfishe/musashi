@@ -4747,7 +4747,9 @@ M68KMAKE_OP(divs, 16, ., d)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
+		/* 68000: on overflow, abort early - only 10 cycles total for Dn source */
+		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(-104);
 		FLAG_V = VFLAG_SET;
 		FLAG_C = CFLAG_CLEAR;
 		return;
@@ -4798,7 +4800,9 @@ M68KMAKE_OP(divs, 16, ., .)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
+		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(-104);
 		FLAG_V = VFLAG_SET;
 		FLAG_C = CFLAG_CLEAR;
 		return;
@@ -4876,7 +4880,9 @@ M68KMAKE_OP(divu, 16, ., .)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, V=1, C=0 (N/Z undefined, destination unchanged) */
+		/* 68000: on overflow, abort early - only 10 cycles + EA cycles */
+		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
+			USE_CYCLES(-98);
 		FLAG_V = VFLAG_SET;
 		FLAG_C = CFLAG_CLEAR;
 		return;
