@@ -4762,9 +4762,9 @@ M68KMAKE_OP(divs, 16, ., d)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, abort early - only 16 cycles total for Dn source */
+		/* 68000 DIVS overflow: 16 cycles if dividend>=0, 18 if dividend<0 */
 		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
-			USE_CYCLES(-104);
+			USE_CYCLES(MAKE_INT_32(*r_dst) < 0 ? -102 : -104);
 		FLAG_V = VFLAG_SET;
 		FLAG_C = CFLAG_CLEAR;
 		return;
@@ -4832,9 +4832,9 @@ M68KMAKE_OP(divs, 16, ., .)
 			*r_dst = MASK_OUT_ABOVE_32(MASK_OUT_ABOVE_16(quotient) | (remainder << 16));
 			return;
 		}
-		/* 68000: on overflow, abort early - only 16 cycles + EA cycles */
+		/* 68000 DIVS overflow: 16 cycles if dividend>=0, 18 if dividend<0, + EA */
 		if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
-			USE_CYCLES(-104);
+			USE_CYCLES(MAKE_INT_32(*r_dst) < 0 ? -102 : -104);
 		FLAG_V = VFLAG_SET;
 		FLAG_C = CFLAG_CLEAR;
 		return;
