@@ -3,7 +3,7 @@
 ## Current Status
 
 **Correctness: 99.9998%** (1,000,058 / 1,000,060 vectors pass)
-**Cycle accuracy: 99.89%** (~1,148,984 / 1,150,060 vectors match)
+**Cycle accuracy: 99.89%** (998,985 / 1,000,060 vectors match)
 
 ---
 
@@ -43,7 +43,7 @@ Comprehensive tracking for address error pre-fault cycles:
 - Non-AERR timing issues (base instruction cycles)
 - Example: MOVE.w -(A7),(d16,A0): delta=-6
 
-### 3. DIVU Edge Case (1 vector)
-- exp=46, got=38 — specific corner case
+### 3. DIVU Edge Case ✓ FIXED
+- Divide-by-zero exception now includes EA fetch cycles
 
 ---

@@ -2525,8 +2525,10 @@ static inline void m68ki_exception_trap_pc(uint vector, uint pc)
 
 	m68ki_jump_vector(vector);
 
-	/* Use up some clock cycles and undo the instruction's cycles */
-	USE_CYCLES(CYC_EXCEPTION[vector] - CYC_INSTRUCTION[REG_IR]);
+	/* Use up some clock cycles and undo the instruction's cycles.
+	 * For traps like divide-by-zero, include EA fetch cycles that
+	 * were consumed before the exception was detected. */
+	USE_CYCLES(CYC_EXCEPTION[vector] - CYC_INSTRUCTION[REG_IR] + m68ki_aerr_cycles);
 }
 
 /* Trap#n stacks a 0 frame but behaves like group2 otherwise */
