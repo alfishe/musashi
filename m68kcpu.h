@@ -907,10 +907,10 @@ extern jmp_buf m68ki_aerr_trap;
 #define EA_AY_PI_8()   (AY++)                                /* postincrement (size = byte) */
 #define EA_AY_PI_16()  m68ki_ea_ay_pi_16()                   /* postincrement (size = word) */
 #define EA_AY_PI_32()  m68ki_ea_ay_pi_32()                   /* postincrement (size = long) */
-#define EA_AY_PD_8()   (--AY)                                /* predecrement (size = byte) */
-#define EA_AY_PD_16()  (AY-=2)                               /* predecrement (size = word) */
+#define EA_AY_PD_8()   m68ki_ea_ay_pd_8()                    /* predecrement (size = byte) */
+#define EA_AY_PD_16()  m68ki_ea_ay_pd_16()                   /* predecrement (size = word) */
 #define EA_AY_PD_32()  m68ki_ea_ay_pd_32()                   /* predecrement (size = long) */
-#define EA_AY_DI_8()   (AY+MAKE_INT_16(m68ki_read_imm_16())) /* displacement */
+#define EA_AY_DI_8()   m68ki_ea_ay_di()                      /* displacement */
 #define EA_AY_DI_16()  EA_AY_DI_8()
 #define EA_AY_DI_32()  EA_AY_DI_8()
 #define EA_AY_IX_8()   m68ki_get_ea_ix(AY)                   /* indirect + index */
@@ -923,10 +923,10 @@ extern jmp_buf m68ki_aerr_trap;
 #define EA_AX_PI_8()   (AX++)
 #define EA_AX_PI_16()  m68ki_ea_ax_pi_16()
 #define EA_AX_PI_32()  m68ki_ea_ax_pi_32()
-#define EA_AX_PD_8()   (--AX)
-#define EA_AX_PD_16()  (AX-=2)
+#define EA_AX_PD_8()   m68ki_ea_ax_pd_8()
+#define EA_AX_PD_16()  m68ki_ea_ax_pd_16()
 #define EA_AX_PD_32()  m68ki_ea_ax_pd_32()
-#define EA_AX_DI_8()   (AX+MAKE_INT_16(m68ki_read_imm_16()))
+#define EA_AX_DI_8()   m68ki_ea_ax_di()
 #define EA_AX_DI_16()  EA_AX_DI_8()
 #define EA_AX_DI_32()  EA_AX_DI_8()
 #define EA_AX_IX_8()   m68ki_get_ea_ix(AX)
@@ -936,10 +936,10 @@ extern jmp_buf m68ki_aerr_trap;
 #define EA_A7_PI_8()   ((REG_A[7]+=2)-2)
 #define EA_A7_PD_8()   (REG_A[7]-=2)
 
-#define EA_AW_8()      MAKE_INT_16(m68ki_read_imm_16())      /* absolute word */
+#define EA_AW_8()      m68ki_ea_aw()                         /* absolute word */
 #define EA_AW_16()     EA_AW_8()
 #define EA_AW_32()     EA_AW_8()
-#define EA_AL_8()      m68ki_read_imm_32()                   /* absolute long */
+#define EA_AL_8()      m68ki_ea_al()                         /* absolute long */
 #define EA_AL_16()     EA_AL_8()
 #define EA_AL_32()     EA_AL_8()
 #define EA_PCDI_8()    m68ki_get_ea_pcdi()                   /* pc indirect + displacement */
@@ -950,9 +950,9 @@ extern jmp_buf m68ki_aerr_trap;
 #define EA_PCIX_32()   EA_PCIX_8()
 
 
-#define OPER_I_8()     m68ki_read_imm_8()
-#define OPER_I_16()    m68ki_read_imm_16()
-#define OPER_I_32()    m68ki_read_imm_32()
+#define OPER_I_8()     m68ki_oper_i_8()
+#define OPER_I_16()    m68ki_oper_i_16()
+#define OPER_I_32()    m68ki_oper_i_32()
 
 
 
@@ -1262,6 +1262,7 @@ extern const uint8    m68ki_ea_idx_cycle_table[];
 extern uint           m68ki_aerr_address;
 extern uint           m68ki_aerr_write_mode;
 extern uint           m68ki_aerr_fc;
+extern uint           m68ki_aerr_cycles;      /* Cycles consumed before address error */
 extern uint           m68ki_aerr_pc;
 extern int            m68ki_aerr_pc_offset;
 extern int            m68ki_aerr_restore_reg;  /* REGISTER INDEX (0-7), NOT value! Use (REG_IR>>9)&7 for AX idx, REG_IR&7 for AY idx */
@@ -1292,6 +1293,7 @@ static inline uint m68ki_ea_ay_pi_32(void)
 
 static inline uint m68ki_ea_ay_pd_32(void)
 {
+	m68ki_aerr_cycles += 2;  /* Predecrement overhead */
 	AY -= 4;
 	/* Pre-decrement is committed before the bus cycle on real 68000;
 	 * it is NOT undone by an address error.  Do NOT set restore. */
@@ -1314,10 +1316,84 @@ static inline uint m68ki_ea_ax_pi_32(void)
 
 static inline uint m68ki_ea_ax_pd_32(void)
 {
+	m68ki_aerr_cycles += 2;  /* Predecrement overhead */
 	AX -= 4;
 	/* Pre-decrement is committed before the bus cycle on real 68000;
 	 * it is NOT undone by an address error.  Do NOT set restore. */
 	return AX;
+}
+
+/* Forward declarations for EA helpers */
+static inline uint m68ki_read_imm_8(void);
+static inline uint m68ki_read_imm_16(void);
+static inline uint m68ki_read_imm_32(void);
+
+/* EA helpers with AERR cycle tracking for 68000 address error accuracy */
+static inline uint m68ki_ea_ay_pd_8(void)
+{
+	m68ki_aerr_cycles += 2;  /* Predecrement overhead */
+	return --AY;
+}
+
+static inline uint m68ki_ea_ay_pd_16(void)
+{
+	m68ki_aerr_cycles += 2;  /* Predecrement overhead */
+	return AY -= 2;
+}
+
+static inline uint m68ki_ea_ax_pd_8(void)
+{
+	m68ki_aerr_cycles += 2;  /* Predecrement overhead */
+	return --AX;
+}
+
+static inline uint m68ki_ea_ax_pd_16(void)
+{
+	m68ki_aerr_cycles += 2;  /* Predecrement overhead */
+	return AX -= 2;
+}
+
+static inline uint m68ki_ea_ay_di(void)
+{
+	m68ki_aerr_cycles += 4;  /* Extension word fetch */
+	return AY + MAKE_INT_16(m68ki_read_imm_16());
+}
+
+static inline uint m68ki_ea_ax_di(void)
+{
+	m68ki_aerr_cycles += 4;  /* Extension word fetch */
+	return AX + MAKE_INT_16(m68ki_read_imm_16());
+}
+
+static inline uint m68ki_ea_aw(void)
+{
+	m68ki_aerr_cycles += 4;  /* Address word fetch */
+	return MAKE_INT_16(m68ki_read_imm_16());
+}
+
+static inline uint m68ki_ea_al(void)
+{
+	m68ki_aerr_cycles += 8;  /* Address long fetch */
+	return m68ki_read_imm_32();
+}
+
+/* Immediate operand helpers with AERR cycle tracking */
+static inline uint m68ki_oper_i_8(void)
+{
+	m68ki_aerr_cycles += 4;  /* Word fetch for 8-bit immediate */
+	return m68ki_read_imm_8();
+}
+
+static inline uint m68ki_oper_i_16(void)
+{
+	m68ki_aerr_cycles += 4;  /* Word fetch for 16-bit immediate */
+	return m68ki_read_imm_16();
+}
+
+static inline uint m68ki_oper_i_32(void)
+{
+	m68ki_aerr_cycles += 8;  /* Long fetch for 32-bit immediate */
+	return m68ki_read_imm_32();
 }
 
 /* Forward declarations to keep some of the macros happy */
@@ -1714,6 +1790,7 @@ static inline uint m68ki_get_ea_pcdi(void)
 {
 	uint old_pc = REG_PC;
 	m68ki_use_program_space(); /* auto-disable */
+	m68ki_aerr_cycles += 4;  /* Extension word fetch */
 	return old_pc + MAKE_INT_16(m68ki_read_imm_16());
 }
 
@@ -1776,6 +1853,7 @@ static inline uint m68ki_get_ea_ix(uint An)
 
 	if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
 	{
+		m68ki_aerr_cycles += 6;  /* Extension word (4) + index calc (2) */
 		/* Calculate index */
 		Xn = REG_DA[extension>>12];     /* Xn */
 		if(!BIT_B(extension))           /* W/L */
@@ -2720,6 +2798,53 @@ static inline void m68ki_exception_format_error(void)
 	USE_CYCLES(CYC_EXCEPTION[EXCEPTION_FORMAT_ERROR] - CYC_INSTRUCTION[REG_IR]);
 }
 
+/* Pre-fault cycles for address error, tracked during EA computation.
+ * For control flow AERR (JMP/JSR prefetch at odd target), simple extension
+ * modes use half the tracked cycles due to prefetch overlap. */
+static inline uint m68ki_get_aerr_cycles(void)
+{
+	uint is_control_flow = (m68ki_aerr_fc == FUNCTION_CODE_USER_PROGRAM ||
+	                        m68ki_aerr_fc == FUNCTION_CODE_SUPERVISOR_PROGRAM);
+
+	if (is_control_flow) {
+		/* Special cases for instructions that don't use standard EA modes */
+		uint opcode_hi = (REG_IR >> 8) & 0xff;
+		uint opcode = REG_IR;
+
+		/* RTS: stack read (4+4=8 cycles) before prefetch */
+		if (opcode == 0x4e75) return 8;
+		/* RTR: stack reads SR+PC (4+4+4=12 cycles) before prefetch */
+		if (opcode == 0x4e77) return 12;
+		/* RTE: stack reads SR+PC (min 12 cycles for 68000 frame) */
+		if (opcode == 0x4e73) return 12;
+
+		/* BSR: displacement fetch (2 or 4 cycles) before stack push and branch */
+		if (opcode_hi == 0x61) {
+			uint disp8 = REG_IR & 0xff;
+			return (disp8 == 0 || disp8 == 0xff) ? 10 : 10; /* 8-bit or 16/32-bit disp */
+		}
+
+		/* Bcc/BRA: displacement fetch */
+		if ((opcode_hi & 0xf0) == 0x60) {
+			return 2;  /* Branch taken prefetch overhead */
+		}
+
+		/* DBcc: loop counter + displacement */
+		if ((REG_IR & 0xf0f8) == 0x50c8) {
+			return 2;  /* Loop overhead */
+		}
+
+		/* For JMP/JSR, simple EA modes (d16,xxx.W) use half cycles due to
+		 * prefetch overlap. Index modes use full cycles. */
+		uint mode = (REG_IR >> 3) & 7;
+		uint reg = REG_IR & 7;
+		int is_index = (mode == 6) || (mode == 7 && reg == 3);
+		if (!is_index && m68ki_aerr_cycles > 0)
+			return m68ki_aerr_cycles / 2;
+	}
+	return m68ki_aerr_cycles;
+}
+
 /* Exception for address error */
 static inline void m68ki_exception_address_error(void)
 {
@@ -2746,9 +2871,10 @@ static inline void m68ki_exception_address_error(void)
 
 	/* Use up some clock cycles. Note that we don't need to undo the
 	instruction's cycles here as we've longjmp:ed directly from the
-	instruction handler without passing the part of the excecute loop
-	that deducts instruction cycles */
-	USE_CYCLES(CYC_EXCEPTION[EXCEPTION_ADDRESS_ERROR]);
+	instruction handler without passing the part of the execute loop
+	that deducts instruction cycles.
+	Add cycles consumed before the fault (EA calculations, extension fetches). */
+	USE_CYCLES(CYC_EXCEPTION[EXCEPTION_ADDRESS_ERROR] + m68ki_get_aerr_cycles());
 }
 
 

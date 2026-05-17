@@ -3,76 +3,56 @@
 ## Current Status
 
 **Correctness: 99.9998%** (1,000,058 / 1,000,060 vectors pass)
-**Cycle accuracy: 86.8%** (868,390 / 1,000,060 vectors match)
-
----
-
-## Remaining Issues
-
-### 1. ASL.b "Failures" (2 vectors) — TEST DATA BUG ✓
-- Both failing vectors have corrupted expected values in tomharte test suite
-- Upper 24 bits of D2 change when ASL.b only affects low 8 bits
-- **Musashi is correct; test vectors are wrong**
-- No fix needed
-
-### 2. Cycle Mismatches (131,670 vectors)
-
-| Category | Count | % | Fix Complexity |
-|----------|------:|--:|----------------|
-| AERR (got=50) | 131,669 | 99.999% | ⭐⭐⭐⭐ Major |
-| Other | 1 | 0.001% | Edge case |
-
-**DIVU/DIVS: FIXED** — Implemented Jorge Cwik's cycle-accurate division algorithm
-
-### AERR: Pre-Fault Cycle Tracking
-
-**Problem:** All AERR show `got=50` but expected = 50 + EA cycles consumed before fault.
-
-**Root Cause (from Yacht.txt):** The 50 cycles is exception processing only. EA calculation
-cycles consumed before the fault must be added.
-
-**EA Cycle Overheads (68000, word operand):**
-| Mode | Cycles |
-|------|-------:|
-| (An), (An)+  | 4 |
-| -(An)        | 6 |
-| (d16,An)     | 8 |
-| (d8,An,Xn)   | 10 |
-| (xxx).W      | 8 |
-| (xxx).L      | 12 |
-
-**Implementation Plan:**
-1. Add `uint m68ki_aerr_cycles` global variable in m68kcpu.c
-2. Reset to 0 at instruction start (in execute loop)
-3. Accumulate EA cycles in `m68ki_get_ea_*` functions before memory access
-4. In `m68ki_exception_address_error()`: `USE_CYCLES(50 + m68ki_aerr_cycles)`
-
-**Files to modify:**
-- `m68kcpu.c`: Add variable, reset in execute loop
-- `m68kcpu.h`: Declare extern, update exception handler
-- `m68kops.c` / `m68k_in.c`: Update EA calculation functions to accumulate cycles
-
-**Complexity:** Medium - localized to EA calculation paths, ~20 functions to update.
+**Cycle accuracy: 99.1%** (1,139,289 / 1,150,060 vectors match)
 
 ---
 
 ## Completed Fixes
 
-- [x] TAS memory base 14→10
-- [x] Byte immediate +2 removal  
-- [x] ADDQ.w An base 4→8
-- [x] OR.l Dn,Dn base 6→8
-- [x] SUBA.l Dn/An base 6→8
-- [x] MULS Booth encoding fix
-- [x] BTST Dn,#imm +2 cycle fix
-- [x] ADDA.l Dn/An base 6→8
-- [x] ADDA/SUBA.w #imm remove +2 bonus
-- [x] ADD.l/SUB.l Dn/An base 6→8
-- [x] ADDQ/SUBQ.l An base 8→6
-- [x] AND.l Dn,Dn base 6→8 + ANDI.l 14→16
-- [x] BCHG/BCLR/BSET.32 bit>=16 +2
-- [x] ADD.w/SUB.w #imm remove +2 bonus
-- [x] DIVU/DIVS overflow early-exit (10/16 cycles)
-- [x] CHK data-dependent: +2 when src<0 && src<=bound
-- [x] DIVU/DIVS cycle-accurate timing (Jorge Cwik algorithm)
-- [x] DIVS overflow +2 when dividend negative
+### DIVU/DIVS Timing ✓
+Implemented Jorge Cwik's cycle-accurate division algorithm.
+
+### AERR Pre-Fault Cycle Tracking ✓ (Phase 1)
+Added `m68ki_aerr_cycles` tracking for:
+- Predecrement modes: +2 cycles
+- Displacement modes (d16,An): +4 cycles  
+- Indexed modes (d8,An,Xn): +6 cycles
+- Absolute word (xxx).W: +4 cycles
+- Absolute long (xxx).L: +8 cycles
+- PC-relative modes: +4/+6 cycles
+- Immediate operands: +4/+8 cycles
+
+Control flow AERR (JMP/JSR/RTS/RTE/RTR/BSR/Bcc/DBcc) handled with special cases:
+- Simple EA modes use half cycles (prefetch overlap)
+- RTS: +8, RTR/RTE: +12 (stack reads)
+- Branches: +2 (displacement overhead)
+
+**Result:** Control flow instructions now 100% cycle accurate.
+
+---
+
+## Remaining Issues (~0.9%)
+
+### 1. ASL.b "Failures" (2 vectors) — TEST DATA BUG
+- Musashi is correct; test vectors have corrupted expected values
+- No fix needed
+
+### 2. Dual-Operand AERR Tracking (~10,771 vectors)
+
+| Category | Count | Example |
+|----------|------:|---------|
+| ADDX/SUBX -(An),-(An) | ~6,100 | exp=52, got=50 |
+| CMPM (An)+,(An)+ | ~380 | exp=58, got=50 |
+| MOVE indexed src | ~2,600 | exp=64, got=56 |
+| ADDA postinc | ~825 | exp=58, got=50 |
+| DIVU edge case | 1 | exp=46, got=38 |
+
+**Root Cause:** Current tracking doesn't distinguish source vs destination EA.
+When AERR occurs on destination operand, source EA cycles should be included.
+
+**Implementation Plan:**
+1. Track source EA cycles separately from destination EA cycles
+2. In AERR handler, determine which operand faulted based on instruction phase
+3. Add source cycles only when AERR is on destination access
+
+---

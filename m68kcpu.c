@@ -94,6 +94,7 @@ jmp_buf m68ki_aerr_trap;
 uint    m68ki_aerr_address;
 uint    m68ki_aerr_write_mode;
 uint    m68ki_aerr_fc;
+uint    m68ki_aerr_cycles;        /* Cycles consumed before address error */
 uint    m68ki_aerr_pc;
 int     m68ki_aerr_pc_offset = 0;
 int     m68ki_aerr_restore_reg = -1;   /* register INDEX (0-7), NOT value! See AX/AY comment in m68kcpu.h */
@@ -1121,10 +1122,10 @@ int m68k_execute(int num_cycles)
 
 			/* Read an instruction and call its handler */
 			REG_IR = m68ki_read_imm_16();
-			/* Reset AERR restore state — may have been left set by a
-			 * previous instruction's EA helper (e.g. post-increment)
-			 * whose memory access succeeded (no AERR). */
+			/* Reset AERR state — may have been left set by a previous
+			 * instruction's EA helper whose memory access succeeded. */
 			m68ki_aerr_restore_reg = -1;
+			m68ki_aerr_cycles = 0;
 			m68ki_instruction_jump_table[REG_IR]();
 			USE_CYCLES(CYC_INSTRUCTION[REG_IR]);
 
