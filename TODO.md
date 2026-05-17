@@ -24,19 +24,35 @@
 
 **DIVU/DIVS: FIXED** — Implemented Jorge Cwik's cycle-accurate division algorithm
 
-### AERR: Per-Instruction Cycle Tracking
+### AERR: Pre-Fault Cycle Tracking
 
-**Problem:** All AERR show `got=50` but expected ranges 50-72 based on:
-- Cycles consumed before fault (EA calculations already done)
-- Bus cycle phase when error occurred
-- Source/dest addressing mode complexity
+**Problem:** All AERR show `got=50` but expected = 50 + EA cycles consumed before fault.
 
-**Fix would require:**
-- Tracking accumulated cycles in CPU state variable
-- Updating every EA calculation path to increment counter
-- Exception handler reads accumulated value at longjmp time
+**Root Cause (from Yacht.txt):** The 50 cycles is exception processing only. EA calculation
+cycles consumed before the fault must be added.
 
-**Complexity:** Major infrastructure change, touches all EA paths.
+**EA Cycle Overheads (68000, word operand):**
+| Mode | Cycles |
+|------|-------:|
+| (An), (An)+  | 4 |
+| -(An)        | 6 |
+| (d16,An)     | 8 |
+| (d8,An,Xn)   | 10 |
+| (xxx).W      | 8 |
+| (xxx).L      | 12 |
+
+**Implementation Plan:**
+1. Add `uint m68ki_aerr_cycles` global variable in m68kcpu.c
+2. Reset to 0 at instruction start (in execute loop)
+3. Accumulate EA cycles in `m68ki_get_ea_*` functions before memory access
+4. In `m68ki_exception_address_error()`: `USE_CYCLES(50 + m68ki_aerr_cycles)`
+
+**Files to modify:**
+- `m68kcpu.c`: Add variable, reset in execute loop
+- `m68kcpu.h`: Declare extern, update exception handler
+- `m68kops.c` / `m68k_in.c`: Update EA calculation functions to accumulate cycles
+
+**Complexity:** Medium - localized to EA calculation paths, ~20 functions to update.
 
 ---
 
