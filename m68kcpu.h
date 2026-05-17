@@ -2798,50 +2798,70 @@ static inline void m68ki_exception_format_error(void)
 	USE_CYCLES(CYC_EXCEPTION[EXCEPTION_FORMAT_ERROR] - CYC_INSTRUCTION[REG_IR]);
 }
 
-/* Pre-fault cycles for address error, tracked during EA computation.
- * For control flow AERR (JMP/JSR prefetch at odd target), simple extension
- * modes use half the tracked cycles due to prefetch overlap. */
+/* EA cycle table from Yacht.txt (68000 timing reference)
+ * Index: [mode][is_long] where mode 0-6 are standard, 7+ are mode 7 variants
+ * Values: cycles for EA calculation including memory access */
+static const uint8 ea_cycles_68000[12][2] = {
+	/* mode 0: Dn */        { 0,  0},
+	/* mode 1: An */        { 0,  0},
+	/* mode 2: (An) */      { 4,  8},
+	/* mode 3: (An)+ */     { 4,  8},
+	/* mode 4: -(An) */     { 6, 10},
+	/* mode 5: d16(An) */   { 8, 12},
+	/* mode 6: d8(An,Xn) */ {10, 14},
+	/* mode 7.0: xxx.W */   { 8, 12},
+	/* mode 7.1: xxx.L */   {12, 16},
+	/* mode 7.2: d16(PC) */ { 8, 12},
+	/* mode 7.3: d8(PC,Xn)*/{10, 14},
+	/* mode 7.4: #imm */    { 4,  8},
+};
+
+/* Convert EA mode/reg to table index */
+static inline uint ea_table_index(uint mode, uint reg)
+{
+	if (mode < 7) return mode;
+	return 7 + reg;  /* mode 7 variants: 7.0=7, 7.1=8, 7.2=9, 7.3=10, 7.4=11 */
+}
+
+/* Get EA cycles for a given mode/reg/size */
+static inline uint get_ea_cycles(uint mode, uint reg, int is_long)
+{
+	uint idx = ea_table_index(mode, reg);
+	if (idx > 11) return 0;
+	return ea_cycles_68000[idx][is_long ? 1 : 0];
+}
+
+/* Pre-fault cycles for address error, computed from opcode at exception time.
+ * Uses Yacht.txt EA cycle tables instead of incremental tracking. */
 static inline uint m68ki_get_aerr_cycles(void)
 {
 	uint is_control_flow = (m68ki_aerr_fc == FUNCTION_CODE_USER_PROGRAM ||
 	                        m68ki_aerr_fc == FUNCTION_CODE_SUPERVISOR_PROGRAM);
 
 	if (is_control_flow) {
-		/* Special cases for instructions that don't use standard EA modes */
+		/* Control flow instructions: RTS/RTR/RTE/BSR/Bcc/DBcc/JMP/JSR */
 		uint opcode_hi = (REG_IR >> 8) & 0xff;
 		uint opcode = REG_IR;
 
-		/* RTS: stack read (4+4=8 cycles) before prefetch */
-		if (opcode == 0x4e75) return 8;
-		/* RTR: stack reads SR+PC (4+4+4=12 cycles) before prefetch */
-		if (opcode == 0x4e77) return 12;
-		/* RTE: stack reads SR+PC (min 12 cycles for 68000 frame) */
-		if (opcode == 0x4e73) return 12;
+		if (opcode == 0x4e75) return 8;   /* RTS: 2 stack reads */
+		if (opcode == 0x4e77) return 12;  /* RTR: 3 stack reads */
+		if (opcode == 0x4e73) return 12;  /* RTE: 3 stack reads */
+		if (opcode_hi == 0x61) return 10; /* BSR */
+		if ((opcode_hi & 0xf0) == 0x60) return 2;  /* Bcc/BRA */
+		if ((REG_IR & 0xf0f8) == 0x50c8) return 2; /* DBcc */
 
-		/* BSR: displacement fetch (2 or 4 cycles) before stack push and branch */
-		if (opcode_hi == 0x61) {
-			uint disp8 = REG_IR & 0xff;
-			return (disp8 == 0 || disp8 == 0xff) ? 10 : 10; /* 8-bit or 16/32-bit disp */
-		}
-
-		/* Bcc/BRA: displacement fetch */
-		if ((opcode_hi & 0xf0) == 0x60) {
-			return 2;  /* Branch taken prefetch overhead */
-		}
-
-		/* DBcc: loop counter + displacement */
-		if ((REG_IR & 0xf0f8) == 0x50c8) {
-			return 2;  /* Loop overhead */
-		}
-
-		/* For JMP/JSR, simple EA modes (d16,xxx.W) use half cycles due to
-		 * prefetch overlap. Index modes use full cycles. */
+		/* JMP/JSR: use tracked EA cycles / 2 for simple modes (prefetch overlap) */
 		uint mode = (REG_IR >> 3) & 7;
 		uint reg = REG_IR & 7;
 		int is_index = (mode == 6) || (mode == 7 && reg == 3);
 		if (!is_index && m68ki_aerr_cycles > 0)
 			return m68ki_aerr_cycles / 2;
+		return m68ki_aerr_cycles;
 	}
+
+	/* For non-control-flow data AERR, use tracked cycles */
+
+	/* Non-MOVE data instructions: use tracked cycles */
 	return m68ki_aerr_cycles;
 }
 

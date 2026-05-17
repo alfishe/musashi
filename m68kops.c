@@ -2460,11 +2460,14 @@ static void m68k_op_addx_32_mm(void)
 	 * If the address after step 1 is odd, an AERR fires leaving Areg at
 	 * (original - 2), not (original - 4).  Both Ay and Ax must be split.
 	 */
+	m68ki_aerr_cycles += 2;  /* Source predecrement overhead */
 	AY -= 2;
 	m68ki_check_address_error_010_less(AY, MODE_READ, FLAG_S | m68ki_get_address_space());
 	AY -= 2;
 	uint src = m68ki_read_32(AY);
+	m68ki_aerr_cycles += 6;  /* Source read + additional overhead */
 
+	m68ki_aerr_cycles += 2;  /* Dest predecrement overhead */
 	AX -= 2;
 	m68ki_check_address_error_010_less(AX, MODE_READ, FLAG_S | m68ki_get_address_space());
 	AX -= 2;
@@ -35105,11 +35108,14 @@ static void m68k_op_subx_16_mm(void)
 static void m68k_op_subx_32_mm(void)
 {
 	/* Silicon-accurate two-step predecrement — see addx 32 mm above. */
+	m68ki_aerr_cycles += 2;  /* Source predecrement overhead */
 	AY -= 2;
 	m68ki_check_address_error_010_less(AY, MODE_READ, FLAG_S | m68ki_get_address_space());
 	AY -= 2;
 	uint src = m68ki_read_32(AY);
+	m68ki_aerr_cycles += 6;  /* Source read + additional overhead */
 
+	m68ki_aerr_cycles += 2;  /* Dest predecrement overhead */
 	AX -= 2;
 	m68ki_check_address_error_010_less(AX, MODE_READ, FLAG_S | m68ki_get_address_space());
 	AX -= 2;
