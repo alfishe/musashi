@@ -1268,6 +1268,25 @@ extern int            m68ki_aerr_pc_offset;
 extern int            m68ki_aerr_restore_reg;  /* REGISTER INDEX (0-7), NOT value! Use (REG_IR>>9)&7 for AX idx, REG_IR&7 for AY idx */
 extern int            m68ki_aerr_restore_val;
 
+/* ======================================================================== */
+/* =============== ADDRESS ERROR CYCLE TRACKING (68000/010) =============== */
+/* ======================================================================== */
+/*
+ * When an address error occurs, the 68000 stacks cycles consumed BEFORE the
+ * faulting access. These constants define the cycle adjustments for AERR
+ * tracking accuracy, derived from Yacht.txt timing reference.
+ */
+#define AERR_PREDEC_OVERHEAD        2  /* -(An) address calculation */
+#define AERR_EXT_WORD_FETCH         4  /* Extension word fetch (d16, index, xxx.W) */
+#define AERR_EXT_LONG_FETCH         8  /* Extension long fetch (xxx.L, #imm.L) */
+#define AERR_INDEX_CALC             6  /* d8(An,Xn): ext word (4) + index calc (2) */
+#define AERR_READ_COMPLETION_WL     4  /* Completed word/byte read */
+#define AERR_READ_COMPLETION_L      8  /* Completed long read (two bus cycles) */
+#define AERR_ADDXL_SRC_READ_EXTRA   6  /* ADDX.l mm: source read + extra overhead */
+#define AERR_MOVE_DEST_PD_WRITE     2  /* MOVE to -(An) predec write setup */
+#define AERR_MOVE_DEST_AL_OVERLAP  -4  /* MOVE to (xxx).L: first ext overlaps src read */
+#define AERR_ADDX_DEST_PD_OVERLAP  -2  /* ADDX/SUBX dest predec overlaps source */
+
 /* Effective Address Helpers for 68000/010 Address Error fidelity.
  * Post-increment (pi) and pre-decrement (pd) variants modify the
  * address register BEFORE the actual memory access.  If the access
@@ -1293,7 +1312,7 @@ static inline uint m68ki_ea_ay_pi_32(void)
 
 static inline uint m68ki_ea_ay_pd_32(void)
 {
-	m68ki_aerr_cycles += 2;  /* Predecrement overhead */
+	m68ki_aerr_cycles += AERR_PREDEC_OVERHEAD;
 	AY -= 4;
 	/* Pre-decrement is committed before the bus cycle on real 68000;
 	 * it is NOT undone by an address error.  Do NOT set restore. */
@@ -1316,7 +1335,7 @@ static inline uint m68ki_ea_ax_pi_32(void)
 
 static inline uint m68ki_ea_ax_pd_32(void)
 {
-	m68ki_aerr_cycles += 2;  /* Predecrement overhead */
+	m68ki_aerr_cycles += AERR_PREDEC_OVERHEAD;
 	AX -= 4;
 	/* Pre-decrement is committed before the bus cycle on real 68000;
 	 * it is NOT undone by an address error.  Do NOT set restore. */
@@ -1331,69 +1350,109 @@ static inline uint m68ki_read_imm_32(void);
 /* EA helpers with AERR cycle tracking for 68000 address error accuracy */
 static inline uint m68ki_ea_ay_pd_8(void)
 {
-	m68ki_aerr_cycles += 2;  /* Predecrement overhead */
+	m68ki_aerr_cycles += AERR_PREDEC_OVERHEAD;
 	return --AY;
 }
 
 static inline uint m68ki_ea_ay_pd_16(void)
 {
-	m68ki_aerr_cycles += 2;  /* Predecrement overhead */
+	m68ki_aerr_cycles += AERR_PREDEC_OVERHEAD;
 	return AY -= 2;
 }
 
 static inline uint m68ki_ea_ax_pd_8(void)
 {
-	m68ki_aerr_cycles += 2;  /* Predecrement overhead */
+	m68ki_aerr_cycles += AERR_PREDEC_OVERHEAD;
 	return --AX;
 }
 
 static inline uint m68ki_ea_ax_pd_16(void)
 {
-	m68ki_aerr_cycles += 2;  /* Predecrement overhead */
+	m68ki_aerr_cycles += AERR_PREDEC_OVERHEAD;
 	return AX -= 2;
 }
 
 static inline uint m68ki_ea_ay_di(void)
 {
-	m68ki_aerr_cycles += 4;  /* Extension word fetch */
+	m68ki_aerr_cycles += AERR_EXT_WORD_FETCH;
 	return AY + MAKE_INT_16(m68ki_read_imm_16());
 }
 
 static inline uint m68ki_ea_ax_di(void)
 {
-	m68ki_aerr_cycles += 4;  /* Extension word fetch */
+	m68ki_aerr_cycles += AERR_EXT_WORD_FETCH;
 	return AX + MAKE_INT_16(m68ki_read_imm_16());
 }
 
 static inline uint m68ki_ea_aw(void)
 {
-	m68ki_aerr_cycles += 4;  /* Address word fetch */
+	m68ki_aerr_cycles += AERR_EXT_WORD_FETCH;
 	return MAKE_INT_16(m68ki_read_imm_16());
 }
 
 static inline uint m68ki_ea_al(void)
 {
-	m68ki_aerr_cycles += 8;  /* Address long fetch */
+	m68ki_aerr_cycles += AERR_EXT_LONG_FETCH;
 	return m68ki_read_imm_32();
 }
 
 /* Immediate operand helpers with AERR cycle tracking */
 static inline uint m68ki_oper_i_8(void)
 {
-	m68ki_aerr_cycles += 4;  /* Word fetch for 8-bit immediate */
+	m68ki_aerr_cycles += AERR_EXT_WORD_FETCH;
 	return m68ki_read_imm_8();
 }
 
 static inline uint m68ki_oper_i_16(void)
 {
-	m68ki_aerr_cycles += 4;  /* Word fetch for 16-bit immediate */
+	m68ki_aerr_cycles += AERR_EXT_WORD_FETCH;
 	return m68ki_read_imm_16();
 }
 
 static inline uint m68ki_oper_i_32(void)
 {
-	m68ki_aerr_cycles += 8;  /* Long fetch for 32-bit immediate */
+	m68ki_aerr_cycles += AERR_EXT_LONG_FETCH;
 	return m68ki_read_imm_32();
+}
+
+/* ======================================================================== */
+/* ============= MOVE DESTINATION EA WRAPPERS (AERR ACCURACY) ============= */
+/* ======================================================================== */
+/*
+ * MOVE instructions have unique AERR timing: if dest write faults, source
+ * read cycles are already committed. These wrappers add the appropriate
+ * adjustments for MOVE destination modes.
+ *
+ * EA_AX_PD_*_MOVE_DEST: Predecrement destination adds 2 cycles for write setup
+ * EA_AL_*_MOVE_DEST: Absolute long destination subtracts 4 (first extension
+ *                    word fetch overlaps with completed source read)
+ */
+static inline uint EA_AX_PD_16_MOVE_DEST(void)
+{
+	uint ea = EA_AX_PD_16();
+	m68ki_aerr_cycles += AERR_MOVE_DEST_PD_WRITE;
+	return ea;
+}
+
+static inline uint EA_AX_PD_32_MOVE_DEST(void)
+{
+	uint ea = EA_AX_PD_32();
+	m68ki_aerr_cycles += AERR_MOVE_DEST_PD_WRITE;
+	return ea;
+}
+
+static inline uint EA_AL_16_MOVE_DEST(void)
+{
+	uint ea = EA_AL_16();
+	m68ki_aerr_cycles += AERR_MOVE_DEST_AL_OVERLAP;
+	return ea;
+}
+
+static inline uint EA_AL_32_MOVE_DEST(void)
+{
+	uint ea = EA_AL_32();
+	m68ki_aerr_cycles += AERR_MOVE_DEST_AL_OVERLAP;
+	return ea;
 }
 
 /* Forward declarations to keep some of the macros happy */
@@ -1790,7 +1849,7 @@ static inline uint m68ki_get_ea_pcdi(void)
 {
 	uint old_pc = REG_PC;
 	m68ki_use_program_space(); /* auto-disable */
-	m68ki_aerr_cycles += 4;  /* Extension word fetch */
+	m68ki_aerr_cycles += AERR_EXT_WORD_FETCH;
 	return old_pc + MAKE_INT_16(m68ki_read_imm_16());
 }
 
@@ -1853,7 +1912,7 @@ static inline uint m68ki_get_ea_ix(uint An)
 
 	if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
 	{
-		m68ki_aerr_cycles += 6;  /* Extension word (4) + index calc (2) */
+		m68ki_aerr_cycles += AERR_INDEX_CALC;
 		/* Calculate index */
 		Xn = REG_DA[extension>>12];     /* Xn */
 		if(!BIT_B(extension))           /* W/L */
@@ -1916,54 +1975,55 @@ static inline uint m68ki_get_ea_ix(uint An)
 }
 
 
-/* Fetch operands - track read completion for AERR on subsequent accesses */
-static inline uint OPER_AY_AI_8(void)  {uint ea = EA_AY_AI_8();  uint v = m68ki_read_8(ea);  m68ki_aerr_cycles += 4; return v;}
-static inline uint OPER_AY_AI_16(void) {uint ea = EA_AY_AI_16(); uint v = m68ki_read_16(ea); m68ki_aerr_cycles += 4; return v;}
-static inline uint OPER_AY_AI_32(void) {uint ea = EA_AY_AI_32(); uint v = m68ki_read_32(ea); m68ki_aerr_cycles += 8; return v;}
-static inline uint OPER_AY_PI_8(void)  {uint ea = EA_AY_PI_8();  uint v = m68ki_read_8(ea);  m68ki_aerr_cycles += 4; return v;}
-static inline uint OPER_AY_PI_16(void) {uint ea = EA_AY_PI_16(); uint v = m68ki_read_16(ea); m68ki_aerr_cycles += 4; return v;}
-static inline uint OPER_AY_PI_32(void) {uint ea = EA_AY_PI_32(); uint v = m68ki_read_32(ea); m68ki_aerr_cycles += 8; return v;}
-static inline uint OPER_AY_PD_8(void)  {uint ea = EA_AY_PD_8();  uint v = m68ki_read_8(ea);  m68ki_aerr_cycles += 4; return v;}
-static inline uint OPER_AY_PD_16(void) {uint ea = EA_AY_PD_16(); uint v = m68ki_read_16(ea); m68ki_aerr_cycles += 4; return v;}
-static inline uint OPER_AY_PD_32(void) {uint ea = EA_AY_PD_32(); uint v = m68ki_read_32(ea); m68ki_aerr_cycles += 8; return v;}
-static inline uint OPER_AY_DI_8(void)  {uint ea = EA_AY_DI_8();  uint v = m68ki_read_8(ea);  m68ki_aerr_cycles += 4; return v;}
-static inline uint OPER_AY_DI_16(void) {uint ea = EA_AY_DI_16(); uint v = m68ki_read_16(ea); m68ki_aerr_cycles += 4; return v;}
-static inline uint OPER_AY_DI_32(void) {uint ea = EA_AY_DI_32(); uint v = m68ki_read_32(ea); m68ki_aerr_cycles += 8; return v;}
-static inline uint OPER_AY_IX_8(void)  {uint ea = EA_AY_IX_8();  uint v = m68ki_read_8(ea);  m68ki_aerr_cycles += 4; return v;}
-static inline uint OPER_AY_IX_16(void) {uint ea = EA_AY_IX_16(); uint v = m68ki_read_16(ea); m68ki_aerr_cycles += 4; return v;}
-static inline uint OPER_AY_IX_32(void) {uint ea = EA_AY_IX_32(); uint v = m68ki_read_32(ea); m68ki_aerr_cycles += 8; return v;}
+/* Fetch operands - track read completion for AERR on subsequent accesses
+ * Word/long reads add AERR_READ_COMPLETION_WL (4), long adds AERR_READ_COMPLETION_L (8) */
+static inline uint OPER_AY_AI_8(void)  {uint ea = EA_AY_AI_8();  uint v = m68ki_read_8(ea);  m68ki_aerr_cycles += AERR_READ_COMPLETION_WL; return v;}
+static inline uint OPER_AY_AI_16(void) {uint ea = EA_AY_AI_16(); uint v = m68ki_read_16(ea); m68ki_aerr_cycles += AERR_READ_COMPLETION_WL; return v;}
+static inline uint OPER_AY_AI_32(void) {uint ea = EA_AY_AI_32(); uint v = m68ki_read_32(ea); m68ki_aerr_cycles += AERR_READ_COMPLETION_L; return v;}
+static inline uint OPER_AY_PI_8(void)  {uint ea = EA_AY_PI_8();  uint v = m68ki_read_8(ea);  m68ki_aerr_cycles += AERR_READ_COMPLETION_WL; return v;}
+static inline uint OPER_AY_PI_16(void) {uint ea = EA_AY_PI_16(); uint v = m68ki_read_16(ea); m68ki_aerr_cycles += AERR_READ_COMPLETION_WL; return v;}
+static inline uint OPER_AY_PI_32(void) {uint ea = EA_AY_PI_32(); uint v = m68ki_read_32(ea); m68ki_aerr_cycles += AERR_READ_COMPLETION_L; return v;}
+static inline uint OPER_AY_PD_8(void)  {uint ea = EA_AY_PD_8();  uint v = m68ki_read_8(ea);  m68ki_aerr_cycles += AERR_READ_COMPLETION_WL; return v;}
+static inline uint OPER_AY_PD_16(void) {uint ea = EA_AY_PD_16(); uint v = m68ki_read_16(ea); m68ki_aerr_cycles += AERR_READ_COMPLETION_WL; return v;}
+static inline uint OPER_AY_PD_32(void) {uint ea = EA_AY_PD_32(); uint v = m68ki_read_32(ea); m68ki_aerr_cycles += AERR_READ_COMPLETION_L; return v;}
+static inline uint OPER_AY_DI_8(void)  {uint ea = EA_AY_DI_8();  uint v = m68ki_read_8(ea);  m68ki_aerr_cycles += AERR_READ_COMPLETION_WL; return v;}
+static inline uint OPER_AY_DI_16(void) {uint ea = EA_AY_DI_16(); uint v = m68ki_read_16(ea); m68ki_aerr_cycles += AERR_READ_COMPLETION_WL; return v;}
+static inline uint OPER_AY_DI_32(void) {uint ea = EA_AY_DI_32(); uint v = m68ki_read_32(ea); m68ki_aerr_cycles += AERR_READ_COMPLETION_L; return v;}
+static inline uint OPER_AY_IX_8(void)  {uint ea = EA_AY_IX_8();  uint v = m68ki_read_8(ea);  m68ki_aerr_cycles += AERR_READ_COMPLETION_WL; return v;}
+static inline uint OPER_AY_IX_16(void) {uint ea = EA_AY_IX_16(); uint v = m68ki_read_16(ea); m68ki_aerr_cycles += AERR_READ_COMPLETION_WL; return v;}
+static inline uint OPER_AY_IX_32(void) {uint ea = EA_AY_IX_32(); uint v = m68ki_read_32(ea); m68ki_aerr_cycles += AERR_READ_COMPLETION_L; return v;}
 
-static inline uint OPER_AX_AI_8(void)  {uint ea = EA_AX_AI_8();  uint v = m68ki_read_8(ea);  m68ki_aerr_cycles += 4; return v;}
-static inline uint OPER_AX_AI_16(void) {uint ea = EA_AX_AI_16(); uint v = m68ki_read_16(ea); m68ki_aerr_cycles += 4; return v;}
-static inline uint OPER_AX_AI_32(void) {uint ea = EA_AX_AI_32(); uint v = m68ki_read_32(ea); m68ki_aerr_cycles += 8; return v;}
-static inline uint OPER_AX_PI_8(void)  {uint ea = EA_AX_PI_8();  uint v = m68ki_read_8(ea);  m68ki_aerr_cycles += 4; return v;}
-static inline uint OPER_AX_PI_16(void) {uint ea = EA_AX_PI_16(); uint v = m68ki_read_16(ea); m68ki_aerr_cycles += 4; return v;}
-static inline uint OPER_AX_PI_32(void) {uint ea = EA_AX_PI_32(); uint v = m68ki_read_32(ea); m68ki_aerr_cycles += 8; return v;}
-static inline uint OPER_AX_PD_8(void)  {uint ea = EA_AX_PD_8();  uint v = m68ki_read_8(ea);  m68ki_aerr_cycles += 4; return v;}
-static inline uint OPER_AX_PD_16(void) {uint ea = EA_AX_PD_16(); uint v = m68ki_read_16(ea); m68ki_aerr_cycles += 4; return v;}
-static inline uint OPER_AX_PD_32(void) {uint ea = EA_AX_PD_32(); uint v = m68ki_read_32(ea); m68ki_aerr_cycles += 8; return v;}
-static inline uint OPER_AX_DI_8(void)  {uint ea = EA_AX_DI_8();  uint v = m68ki_read_8(ea);  m68ki_aerr_cycles += 4; return v;}
-static inline uint OPER_AX_DI_16(void) {uint ea = EA_AX_DI_16(); uint v = m68ki_read_16(ea); m68ki_aerr_cycles += 4; return v;}
-static inline uint OPER_AX_DI_32(void) {uint ea = EA_AX_DI_32(); uint v = m68ki_read_32(ea); m68ki_aerr_cycles += 8; return v;}
-static inline uint OPER_AX_IX_8(void)  {uint ea = EA_AX_IX_8();  uint v = m68ki_read_8(ea);  m68ki_aerr_cycles += 4; return v;}
-static inline uint OPER_AX_IX_16(void) {uint ea = EA_AX_IX_16(); uint v = m68ki_read_16(ea); m68ki_aerr_cycles += 4; return v;}
-static inline uint OPER_AX_IX_32(void) {uint ea = EA_AX_IX_32(); uint v = m68ki_read_32(ea); m68ki_aerr_cycles += 8; return v;}
+static inline uint OPER_AX_AI_8(void)  {uint ea = EA_AX_AI_8();  uint v = m68ki_read_8(ea);  m68ki_aerr_cycles += AERR_READ_COMPLETION_WL; return v;}
+static inline uint OPER_AX_AI_16(void) {uint ea = EA_AX_AI_16(); uint v = m68ki_read_16(ea); m68ki_aerr_cycles += AERR_READ_COMPLETION_WL; return v;}
+static inline uint OPER_AX_AI_32(void) {uint ea = EA_AX_AI_32(); uint v = m68ki_read_32(ea); m68ki_aerr_cycles += AERR_READ_COMPLETION_L; return v;}
+static inline uint OPER_AX_PI_8(void)  {uint ea = EA_AX_PI_8();  uint v = m68ki_read_8(ea);  m68ki_aerr_cycles += AERR_READ_COMPLETION_WL; return v;}
+static inline uint OPER_AX_PI_16(void) {uint ea = EA_AX_PI_16(); uint v = m68ki_read_16(ea); m68ki_aerr_cycles += AERR_READ_COMPLETION_WL; return v;}
+static inline uint OPER_AX_PI_32(void) {uint ea = EA_AX_PI_32(); uint v = m68ki_read_32(ea); m68ki_aerr_cycles += AERR_READ_COMPLETION_L; return v;}
+static inline uint OPER_AX_PD_8(void)  {uint ea = EA_AX_PD_8();  uint v = m68ki_read_8(ea);  m68ki_aerr_cycles += AERR_READ_COMPLETION_WL; return v;}
+static inline uint OPER_AX_PD_16(void) {uint ea = EA_AX_PD_16(); uint v = m68ki_read_16(ea); m68ki_aerr_cycles += AERR_READ_COMPLETION_WL; return v;}
+static inline uint OPER_AX_PD_32(void) {uint ea = EA_AX_PD_32(); uint v = m68ki_read_32(ea); m68ki_aerr_cycles += AERR_READ_COMPLETION_L; return v;}
+static inline uint OPER_AX_DI_8(void)  {uint ea = EA_AX_DI_8();  uint v = m68ki_read_8(ea);  m68ki_aerr_cycles += AERR_READ_COMPLETION_WL; return v;}
+static inline uint OPER_AX_DI_16(void) {uint ea = EA_AX_DI_16(); uint v = m68ki_read_16(ea); m68ki_aerr_cycles += AERR_READ_COMPLETION_WL; return v;}
+static inline uint OPER_AX_DI_32(void) {uint ea = EA_AX_DI_32(); uint v = m68ki_read_32(ea); m68ki_aerr_cycles += AERR_READ_COMPLETION_L; return v;}
+static inline uint OPER_AX_IX_8(void)  {uint ea = EA_AX_IX_8();  uint v = m68ki_read_8(ea);  m68ki_aerr_cycles += AERR_READ_COMPLETION_WL; return v;}
+static inline uint OPER_AX_IX_16(void) {uint ea = EA_AX_IX_16(); uint v = m68ki_read_16(ea); m68ki_aerr_cycles += AERR_READ_COMPLETION_WL; return v;}
+static inline uint OPER_AX_IX_32(void) {uint ea = EA_AX_IX_32(); uint v = m68ki_read_32(ea); m68ki_aerr_cycles += AERR_READ_COMPLETION_L; return v;}
 
-static inline uint OPER_A7_PI_8(void)  {uint ea = EA_A7_PI_8();  uint v = m68ki_read_8(ea);  m68ki_aerr_cycles += 4; return v;}
-static inline uint OPER_A7_PD_8(void)  {uint ea = EA_A7_PD_8();  uint v = m68ki_read_8(ea);  m68ki_aerr_cycles += 2; return v;}
+static inline uint OPER_A7_PI_8(void)  {uint ea = EA_A7_PI_8();  uint v = m68ki_read_8(ea);  m68ki_aerr_cycles += AERR_READ_COMPLETION_WL; return v;}
+static inline uint OPER_A7_PD_8(void)  {uint ea = EA_A7_PD_8();  uint v = m68ki_read_8(ea);  m68ki_aerr_cycles += AERR_PREDEC_OVERHEAD; return v;}
 
-static inline uint OPER_AW_8(void)     {uint ea = EA_AW_8();     uint v = m68ki_read_8(ea);  m68ki_aerr_cycles += 4; return v;}
-static inline uint OPER_AW_16(void)    {uint ea = EA_AW_16();    uint v = m68ki_read_16(ea); m68ki_aerr_cycles += 4; return v;}
-static inline uint OPER_AW_32(void)    {uint ea = EA_AW_32();    uint v = m68ki_read_32(ea); m68ki_aerr_cycles += 8; return v;}
-static inline uint OPER_AL_8(void)     {uint ea = EA_AL_8();     uint v = m68ki_read_8(ea);  m68ki_aerr_cycles += 4; return v;}
-static inline uint OPER_AL_16(void)    {uint ea = EA_AL_16();    uint v = m68ki_read_16(ea); m68ki_aerr_cycles += 4; return v;}
-static inline uint OPER_AL_32(void)    {uint ea = EA_AL_32();    uint v = m68ki_read_32(ea); m68ki_aerr_cycles += 8; return v;}
-static inline uint OPER_PCDI_8(void)   {uint ea = EA_PCDI_8();   uint v = m68ki_read_pcrel_8(ea);  m68ki_aerr_cycles += 4; return v;}
-static inline uint OPER_PCDI_16(void)  {uint ea = EA_PCDI_16();  uint v = m68ki_read_pcrel_16(ea); m68ki_aerr_cycles += 4; return v;}
-static inline uint OPER_PCDI_32(void)  {uint ea = EA_PCDI_32();  uint v = m68ki_read_pcrel_32(ea); m68ki_aerr_cycles += 8; return v;}
-static inline uint OPER_PCIX_8(void)   {uint ea = EA_PCIX_8();   uint v = m68ki_read_pcrel_8(ea);  m68ki_aerr_cycles += 4; return v;}
-static inline uint OPER_PCIX_16(void)  {uint ea = EA_PCIX_16();  uint v = m68ki_read_pcrel_16(ea); m68ki_aerr_cycles += 4; return v;}
-static inline uint OPER_PCIX_32(void)  {uint ea = EA_PCIX_32();  uint v = m68ki_read_pcrel_32(ea); m68ki_aerr_cycles += 8; return v;}
+static inline uint OPER_AW_8(void)     {uint ea = EA_AW_8();     uint v = m68ki_read_8(ea);  m68ki_aerr_cycles += AERR_READ_COMPLETION_WL; return v;}
+static inline uint OPER_AW_16(void)    {uint ea = EA_AW_16();    uint v = m68ki_read_16(ea); m68ki_aerr_cycles += AERR_READ_COMPLETION_WL; return v;}
+static inline uint OPER_AW_32(void)    {uint ea = EA_AW_32();    uint v = m68ki_read_32(ea); m68ki_aerr_cycles += AERR_READ_COMPLETION_L; return v;}
+static inline uint OPER_AL_8(void)     {uint ea = EA_AL_8();     uint v = m68ki_read_8(ea);  m68ki_aerr_cycles += AERR_READ_COMPLETION_WL; return v;}
+static inline uint OPER_AL_16(void)    {uint ea = EA_AL_16();    uint v = m68ki_read_16(ea); m68ki_aerr_cycles += AERR_READ_COMPLETION_WL; return v;}
+static inline uint OPER_AL_32(void)    {uint ea = EA_AL_32();    uint v = m68ki_read_32(ea); m68ki_aerr_cycles += AERR_READ_COMPLETION_L; return v;}
+static inline uint OPER_PCDI_8(void)   {uint ea = EA_PCDI_8();   uint v = m68ki_read_pcrel_8(ea);  m68ki_aerr_cycles += AERR_READ_COMPLETION_WL; return v;}
+static inline uint OPER_PCDI_16(void)  {uint ea = EA_PCDI_16();  uint v = m68ki_read_pcrel_16(ea); m68ki_aerr_cycles += AERR_READ_COMPLETION_WL; return v;}
+static inline uint OPER_PCDI_32(void)  {uint ea = EA_PCDI_32();  uint v = m68ki_read_pcrel_32(ea); m68ki_aerr_cycles += AERR_READ_COMPLETION_L; return v;}
+static inline uint OPER_PCIX_8(void)   {uint ea = EA_PCIX_8();   uint v = m68ki_read_pcrel_8(ea);  m68ki_aerr_cycles += AERR_READ_COMPLETION_WL; return v;}
+static inline uint OPER_PCIX_16(void)  {uint ea = EA_PCIX_16();  uint v = m68ki_read_pcrel_16(ea); m68ki_aerr_cycles += AERR_READ_COMPLETION_WL; return v;}
+static inline uint OPER_PCIX_32(void)  {uint ea = EA_PCIX_32();  uint v = m68ki_read_pcrel_32(ea); m68ki_aerr_cycles += AERR_READ_COMPLETION_L; return v;}
 
 /* Write helpers for MOVE absolute-long destination AERR frames.
  * On the 68000, MOVE to $NNNNNNNN with a memory-source EA stacks a PC

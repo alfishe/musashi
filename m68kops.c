@@ -2384,7 +2384,6 @@ static void m68k_op_addx_8_mm_ay7(void)
 {
 	uint src = OPER_A7_PD_8();
 	uint ea  = EA_AX_PD_8();
-	m68ki_aerr_cycles -= 2;  /* Dest predec overlaps with source read */
 	uint dst = m68ki_read_8(ea);
 	uint res = src + dst + XFLAG_AS_1();
 
@@ -2421,7 +2420,6 @@ static void m68k_op_addx_8_mm(void)
 {
 	uint src = OPER_AY_PD_8();
 	uint ea  = EA_AX_PD_8();
-	m68ki_aerr_cycles -= 2;  /* Dest predec overlaps with source read */
 	uint dst = m68ki_read_8(ea);
 	uint res = src + dst + XFLAG_AS_1();
 
@@ -2440,7 +2438,6 @@ static void m68k_op_addx_16_mm(void)
 {
 	uint src = OPER_AY_PD_16();
 	uint ea  = EA_AX_PD_16();
-	m68ki_aerr_cycles -= 2;  /* Dest predec overlaps with source read */
 	uint dst = m68ki_read_16(ea);
 	uint res = src + dst + XFLAG_AS_1();
 
@@ -20816,7 +20813,6 @@ static void m68k_op_move_16_pd_d(void)
 {
 	uint res = MASK_OUT_ABOVE_16(DY);
 	uint ea = EA_AX_PD_16();
-	m68ki_aerr_cycles += 2;  /* Dest predec write overhead */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -20833,7 +20829,6 @@ static void m68k_op_move_16_pd_a(void)
 {
 	uint res = MASK_OUT_ABOVE_16(AY);
 	uint ea = EA_AX_PD_16();
-	m68ki_aerr_cycles += 2;  /* Dest predec write overhead */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -20850,7 +20845,6 @@ static void m68k_op_move_16_pd_ai(void)
 {
 	uint res = OPER_AY_AI_16();
 	uint ea = EA_AX_PD_16();
-	m68ki_aerr_cycles += 2;  /* Dest predec write overhead */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -20867,7 +20861,6 @@ static void m68k_op_move_16_pd_pi(void)
 {
 	uint res = OPER_AY_PI_16();
 	uint ea = EA_AX_PD_16();
-	m68ki_aerr_cycles += 2;  /* Dest predec write overhead */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -20884,7 +20877,6 @@ static void m68k_op_move_16_pd_pd(void)
 {
 	uint res = OPER_AY_PD_16();
 	uint ea = EA_AX_PD_16();
-	m68ki_aerr_cycles += 2;  /* Dest predec write overhead */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -20901,7 +20893,6 @@ static void m68k_op_move_16_pd_di(void)
 {
 	uint res = OPER_AY_DI_16();
 	uint ea = EA_AX_PD_16();
-	m68ki_aerr_cycles += 2;  /* Dest predec write overhead */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -20918,7 +20909,6 @@ static void m68k_op_move_16_pd_ix(void)
 {
 	uint res = OPER_AY_IX_16();
 	uint ea = EA_AX_PD_16();
-	m68ki_aerr_cycles += 2;  /* Dest predec write overhead */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -20935,7 +20925,6 @@ static void m68k_op_move_16_pd_aw(void)
 {
 	uint res = OPER_AW_16();
 	uint ea = EA_AX_PD_16();
-	m68ki_aerr_cycles += 2;  /* Dest predec write overhead */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -20952,7 +20941,6 @@ static void m68k_op_move_16_pd_al(void)
 {
 	uint res = OPER_AL_16();
 	uint ea = EA_AX_PD_16();
-	m68ki_aerr_cycles += 2;  /* Dest predec write overhead */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -20969,7 +20957,6 @@ static void m68k_op_move_16_pd_pcdi(void)
 {
 	uint res = OPER_PCDI_16();
 	uint ea = EA_AX_PD_16();
-	m68ki_aerr_cycles += 2;  /* Dest predec write overhead */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -20986,7 +20973,6 @@ static void m68k_op_move_16_pd_pcix(void)
 {
 	uint res = OPER_PCIX_16();
 	uint ea = EA_AX_PD_16();
-	m68ki_aerr_cycles += 2;  /* Dest predec write overhead */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -21003,7 +20989,6 @@ static void m68k_op_move_16_pd_i(void)
 {
 	uint res = OPER_I_16();
 	uint ea = EA_AX_PD_16();
-	m68ki_aerr_cycles += 2;  /* Dest predec write overhead */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -21552,7 +21537,6 @@ static void m68k_op_move_16_al_ai(void)
 {
 	uint res = OPER_AY_AI_16();
 	uint ea = EA_AL_16();
-	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -21567,7 +21551,6 @@ static void m68k_op_move_16_al_pi(void)
 {
 	uint res = OPER_AY_PI_16();
 	uint ea = EA_AL_16();
-	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -21582,7 +21565,6 @@ static void m68k_op_move_16_al_pd(void)
 {
 	uint res = OPER_AY_PD_16();
 	uint ea = EA_AL_16();
-	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -21597,7 +21579,6 @@ static void m68k_op_move_16_al_di(void)
 {
 	uint res = OPER_AY_DI_16();
 	uint ea = EA_AL_16();
-	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -21612,7 +21593,6 @@ static void m68k_op_move_16_al_ix(void)
 {
 	uint res = OPER_AY_IX_16();
 	uint ea = EA_AL_16();
-	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -21627,7 +21607,6 @@ static void m68k_op_move_16_al_aw(void)
 {
 	uint res = OPER_AW_16();
 	uint ea = EA_AL_16();
-	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -21642,7 +21621,6 @@ static void m68k_op_move_16_al_al(void)
 {
 	uint res = OPER_AL_16();
 	uint ea = EA_AL_16();
-	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -21657,7 +21635,6 @@ static void m68k_op_move_16_al_pcdi(void)
 {
 	uint res = OPER_PCDI_16();
 	uint ea = EA_AL_16();
-	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -21672,7 +21649,6 @@ static void m68k_op_move_16_al_pcix(void)
 {
 	uint res = OPER_PCIX_16();
 	uint ea = EA_AL_16();
-	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -22241,7 +22217,6 @@ static void m68k_op_move_32_pd_d(void)
 {
 	uint res = DY;
 	uint ea = EA_AX_PD_32();
-	m68ki_aerr_cycles += 2;  /* Dest predec write overhead */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
@@ -22262,7 +22237,6 @@ static void m68k_op_move_32_pd_a(void)
 {
 	uint res = AY;
 	uint ea = EA_AX_PD_32();
-	m68ki_aerr_cycles += 2;  /* Dest predec write overhead */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
@@ -22283,7 +22257,6 @@ static void m68k_op_move_32_pd_ai(void)
 {
 	uint res = OPER_AY_AI_32();
 	uint ea = EA_AX_PD_32();
-	m68ki_aerr_cycles += 2;  /* Dest predec write overhead */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
@@ -22304,7 +22277,6 @@ static void m68k_op_move_32_pd_pi(void)
 {
 	uint res = OPER_AY_PI_32();
 	uint ea = EA_AX_PD_32();
-	m68ki_aerr_cycles += 2;  /* Dest predec write overhead */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
@@ -22325,7 +22297,6 @@ static void m68k_op_move_32_pd_pd(void)
 {
 	uint res = OPER_AY_PD_32();
 	uint ea = EA_AX_PD_32();
-	m68ki_aerr_cycles += 2;  /* Dest predec write overhead */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
@@ -22346,7 +22317,6 @@ static void m68k_op_move_32_pd_di(void)
 {
 	uint res = OPER_AY_DI_32();
 	uint ea = EA_AX_PD_32();
-	m68ki_aerr_cycles += 2;  /* Dest predec write overhead */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
@@ -22367,7 +22337,6 @@ static void m68k_op_move_32_pd_ix(void)
 {
 	uint res = OPER_AY_IX_32();
 	uint ea = EA_AX_PD_32();
-	m68ki_aerr_cycles += 2;  /* Dest predec write overhead */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
@@ -22388,7 +22357,6 @@ static void m68k_op_move_32_pd_aw(void)
 {
 	uint res = OPER_AW_32();
 	uint ea = EA_AX_PD_32();
-	m68ki_aerr_cycles += 2;  /* Dest predec write overhead */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
@@ -22409,7 +22377,6 @@ static void m68k_op_move_32_pd_al(void)
 {
 	uint res = OPER_AL_32();
 	uint ea = EA_AX_PD_32();
-	m68ki_aerr_cycles += 2;  /* Dest predec write overhead */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
@@ -22430,7 +22397,6 @@ static void m68k_op_move_32_pd_pcdi(void)
 {
 	uint res = OPER_PCDI_32();
 	uint ea = EA_AX_PD_32();
-	m68ki_aerr_cycles += 2;  /* Dest predec write overhead */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
@@ -22451,7 +22417,6 @@ static void m68k_op_move_32_pd_pcix(void)
 {
 	uint res = OPER_PCIX_32();
 	uint ea = EA_AX_PD_32();
-	m68ki_aerr_cycles += 2;  /* Dest predec write overhead */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
@@ -22472,7 +22437,6 @@ static void m68k_op_move_32_pd_i(void)
 {
 	uint res = OPER_I_32();
 	uint ea = EA_AX_PD_32();
-	m68ki_aerr_cycles += 2;  /* Dest predec write overhead */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
@@ -23025,7 +22989,6 @@ static void m68k_op_move_32_al_ai(void)
 {
 	uint res = OPER_AY_AI_32();
 	uint ea = EA_AL_32();
-	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
@@ -23040,7 +23003,6 @@ static void m68k_op_move_32_al_pi(void)
 {
 	uint res = OPER_AY_PI_32();
 	uint ea = EA_AL_32();
-	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
@@ -23055,7 +23017,6 @@ static void m68k_op_move_32_al_pd(void)
 {
 	uint res = OPER_AY_PD_32();
 	uint ea = EA_AL_32();
-	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
@@ -23070,7 +23031,6 @@ static void m68k_op_move_32_al_di(void)
 {
 	uint res = OPER_AY_DI_32();
 	uint ea = EA_AL_32();
-	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
@@ -23085,7 +23045,6 @@ static void m68k_op_move_32_al_ix(void)
 {
 	uint res = OPER_AY_IX_32();
 	uint ea = EA_AL_32();
-	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
@@ -23100,7 +23059,6 @@ static void m68k_op_move_32_al_aw(void)
 {
 	uint res = OPER_AW_32();
 	uint ea = EA_AL_32();
-	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
@@ -23115,7 +23073,6 @@ static void m68k_op_move_32_al_al(void)
 {
 	uint res = OPER_AL_32();
 	uint ea = EA_AL_32();
-	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
@@ -23130,7 +23087,6 @@ static void m68k_op_move_32_al_pcdi(void)
 {
 	uint res = OPER_PCDI_32();
 	uint ea = EA_AL_32();
-	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
@@ -23145,7 +23101,6 @@ static void m68k_op_move_32_al_pcix(void)
 {
 	uint res = OPER_PCIX_32();
 	uint ea = EA_AL_32();
-	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
@@ -35082,7 +35037,6 @@ static void m68k_op_subx_8_mm_ay7(void)
 {
 	uint src = OPER_A7_PD_8();
 	uint ea  = EA_AX_PD_8();
-	m68ki_aerr_cycles -= 2;  /* Dest predec overlaps with source read */
 	uint dst = m68ki_read_8(ea);
 	uint res = dst - src - XFLAG_AS_1();
 
@@ -35119,7 +35073,6 @@ static void m68k_op_subx_8_mm(void)
 {
 	uint src = OPER_AY_PD_8();
 	uint ea  = EA_AX_PD_8();
-	m68ki_aerr_cycles -= 2;  /* Dest predec overlaps with source read */
 	uint dst = m68ki_read_8(ea);
 	uint res = dst - src - XFLAG_AS_1();
 
@@ -35138,7 +35091,6 @@ static void m68k_op_subx_16_mm(void)
 {
 	uint src = OPER_AY_PD_16();
 	uint ea  = EA_AX_PD_16();
-	m68ki_aerr_cycles -= 2;  /* Dest predec overlaps with source read */
 	uint dst = m68ki_read_16(ea);
 	uint res = dst - src - XFLAG_AS_1();
 
