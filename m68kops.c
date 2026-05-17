@@ -21537,6 +21537,7 @@ static void m68k_op_move_16_al_ai(void)
 {
 	uint res = OPER_AY_AI_16();
 	uint ea = EA_AL_16();
+	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -21551,6 +21552,7 @@ static void m68k_op_move_16_al_pi(void)
 {
 	uint res = OPER_AY_PI_16();
 	uint ea = EA_AL_16();
+	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -21565,6 +21567,7 @@ static void m68k_op_move_16_al_pd(void)
 {
 	uint res = OPER_AY_PD_16();
 	uint ea = EA_AL_16();
+	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -21579,6 +21582,7 @@ static void m68k_op_move_16_al_di(void)
 {
 	uint res = OPER_AY_DI_16();
 	uint ea = EA_AL_16();
+	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -21593,6 +21597,7 @@ static void m68k_op_move_16_al_ix(void)
 {
 	uint res = OPER_AY_IX_16();
 	uint ea = EA_AL_16();
+	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -21607,6 +21612,7 @@ static void m68k_op_move_16_al_aw(void)
 {
 	uint res = OPER_AW_16();
 	uint ea = EA_AL_16();
+	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -21621,6 +21627,7 @@ static void m68k_op_move_16_al_al(void)
 {
 	uint res = OPER_AL_16();
 	uint ea = EA_AL_16();
+	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -21635,6 +21642,7 @@ static void m68k_op_move_16_al_pcdi(void)
 {
 	uint res = OPER_PCDI_16();
 	uint ea = EA_AL_16();
+	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -21649,6 +21657,7 @@ static void m68k_op_move_16_al_pcix(void)
 {
 	uint res = OPER_PCIX_16();
 	uint ea = EA_AL_16();
+	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_16(res);
 	FLAG_Z = res;
@@ -22989,6 +22998,7 @@ static void m68k_op_move_32_al_ai(void)
 {
 	uint res = OPER_AY_AI_32();
 	uint ea = EA_AL_32();
+	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
@@ -23003,6 +23013,7 @@ static void m68k_op_move_32_al_pi(void)
 {
 	uint res = OPER_AY_PI_32();
 	uint ea = EA_AL_32();
+	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
@@ -23017,6 +23028,7 @@ static void m68k_op_move_32_al_pd(void)
 {
 	uint res = OPER_AY_PD_32();
 	uint ea = EA_AL_32();
+	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
@@ -23031,6 +23043,7 @@ static void m68k_op_move_32_al_di(void)
 {
 	uint res = OPER_AY_DI_32();
 	uint ea = EA_AL_32();
+	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
@@ -23045,6 +23058,7 @@ static void m68k_op_move_32_al_ix(void)
 {
 	uint res = OPER_AY_IX_32();
 	uint ea = EA_AL_32();
+	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
@@ -23059,6 +23073,7 @@ static void m68k_op_move_32_al_aw(void)
 {
 	uint res = OPER_AW_32();
 	uint ea = EA_AL_32();
+	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
@@ -23073,6 +23088,7 @@ static void m68k_op_move_32_al_al(void)
 {
 	uint res = OPER_AL_32();
 	uint ea = EA_AL_32();
+	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
@@ -23087,6 +23103,7 @@ static void m68k_op_move_32_al_pcdi(void)
 {
 	uint res = OPER_PCDI_32();
 	uint ea = EA_AL_32();
+	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
@@ -23101,6 +23118,7 @@ static void m68k_op_move_32_al_pcix(void)
 {
 	uint res = OPER_PCIX_32();
 	uint ea = EA_AL_32();
+	m68ki_aerr_cycles -= 4;  /* First dest extension word overlaps with source read */
 
 	FLAG_N = NFLAG_32(res);
 	FLAG_Z = res;
