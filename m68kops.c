@@ -2384,6 +2384,7 @@ static void m68k_op_addx_8_mm_ay7(void)
 {
 	uint src = OPER_A7_PD_8();
 	uint ea  = EA_AX_PD_8();
+	m68ki_aerr_cycles -= 2;  /* Dest predec overlaps with source read */
 	uint dst = m68ki_read_8(ea);
 	uint res = src + dst + XFLAG_AS_1();
 
@@ -2420,6 +2421,7 @@ static void m68k_op_addx_8_mm(void)
 {
 	uint src = OPER_AY_PD_8();
 	uint ea  = EA_AX_PD_8();
+	m68ki_aerr_cycles -= 2;  /* Dest predec overlaps with source read */
 	uint dst = m68ki_read_8(ea);
 	uint res = src + dst + XFLAG_AS_1();
 
@@ -2438,6 +2440,7 @@ static void m68k_op_addx_16_mm(void)
 {
 	uint src = OPER_AY_PD_16();
 	uint ea  = EA_AX_PD_16();
+	m68ki_aerr_cycles -= 2;  /* Dest predec overlaps with source read */
 	uint dst = m68ki_read_16(ea);
 	uint res = src + dst + XFLAG_AS_1();
 
@@ -35055,6 +35058,7 @@ static void m68k_op_subx_8_mm_ay7(void)
 {
 	uint src = OPER_A7_PD_8();
 	uint ea  = EA_AX_PD_8();
+	m68ki_aerr_cycles -= 2;  /* Dest predec overlaps with source read */
 	uint dst = m68ki_read_8(ea);
 	uint res = dst - src - XFLAG_AS_1();
 
@@ -35091,6 +35095,7 @@ static void m68k_op_subx_8_mm(void)
 {
 	uint src = OPER_AY_PD_8();
 	uint ea  = EA_AX_PD_8();
+	m68ki_aerr_cycles -= 2;  /* Dest predec overlaps with source read */
 	uint dst = m68ki_read_8(ea);
 	uint res = dst - src - XFLAG_AS_1();
 
@@ -35109,6 +35114,7 @@ static void m68k_op_subx_16_mm(void)
 {
 	uint src = OPER_AY_PD_16();
 	uint ea  = EA_AX_PD_16();
+	m68ki_aerr_cycles -= 2;  /* Dest predec overlaps with source read */
 	uint dst = m68ki_read_16(ea);
 	uint res = dst - src - XFLAG_AS_1();
 
