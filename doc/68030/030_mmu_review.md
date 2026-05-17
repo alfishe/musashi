@@ -20,6 +20,7 @@ The core translation, infrastructure, and instructions have been successfully im
 *   **TC Register Validation:** PMOVE to TC now validates IS + TIA + TIB + TIC + TID + PS = 32, raising configuration error (vector 56) if invalid.
 *   **PLRU Replacement Policy:** Replaced round-robin with pseudo-LRU for ATC replacement. History register `mmu_atc_history` tracks recently used entries.
 *   **030 Bus Error Frames:** `m68ki_exception_bus_error()` now builds Format $B stack frames for 68020/030 with SSW and fault address fields populated.
+*   **TC Register Bit Layout:** Fixed PS/IS/TIA/TIB/TIC/TID extraction to match Motorola standard: PS at bits 23-20 (not 27-24), IS at bits 19-16, TIA at bits 15-12, etc. Previous layout was 4 bits off, matching MAME's `(m_mmu_tc >> 20) & 0xf` for PS.
 
 ## ✅ Co-Simulation Interface (April 2026)
 

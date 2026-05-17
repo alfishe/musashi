@@ -211,7 +211,7 @@ static int pmmu_atc_find_victim(void)
 /* pmmu_atc_add: adds this address to the ATC */
 static void pmmu_atc_add(uint32 logical, uint32 physical, int fc, int rw)
 {
-	int ps = (m68ki_cpu.mmu_tc >> 24) & 0xf;  /* PS: bits 27-24 */
+	int ps = (m68ki_cpu.mmu_tc >> 20) & 0xf;  /* PS: bits 23-20 */
 	uint32 atc_tag = M68K_MMU_ATC_VALID | ((fc & 7) << 24) | ((logical >> ps) << (ps - 8));
 	uint32 atc_data = (physical >> ps) << (ps - 8);
 	int i, found;
@@ -331,7 +331,7 @@ static void pmmu_atc_flush_fc_ea(uint16 modes)
 {
 	int fcmask = (modes >> 5) & 7;
 	int fc = pmmu_get_fc(modes) & fcmask;
-	int ps = (m68ki_cpu.mmu_tc >> 24) & 0xf;  /* PS: bits 27-24 */
+	int ps = (m68ki_cpu.mmu_tc >> 20) & 0xf;  /* PS: bits 23-20 */
 	int mode = (modes >> 10) & 7;
 	uint32 ea;
 	int i;
@@ -381,7 +381,7 @@ static void pmmu_atc_flush_fc_ea(uint16 modes)
  */
 static int pmmu_atc_lookup(uint32 addr_in, int fc, int rw, int ptest, uint32 *addr_out)
 {
-	int ps = (m68ki_cpu.mmu_tc >> 24) & 0xf;  /* PS: bits 27-24 */
+	int ps = (m68ki_cpu.mmu_tc >> 20) & 0xf;  /* PS: bits 23-20 */
 	uint32 atc_tag = M68K_MMU_ATC_VALID | ((fc & 7) << 24) | ((addr_in >> ps) << (ps - 8));
 	int i;
 
@@ -562,8 +562,8 @@ static int pmmu_walk_tables(uint32 addr_in, int type, uint32 table, int fc,
 {
 	int level = 0;
 	uint32 bits = m68ki_cpu.mmu_tc & 0xffff;   /* TIA/TIB/TIC/TID */
-	int pagesize = (m68ki_cpu.mmu_tc >> 24) & 0xf;  /* PS: bits 27-24 */
-	int is = (m68ki_cpu.mmu_tc >> 20) & 0xf;        /* IS: bits 23-20 */
+	int pagesize = (m68ki_cpu.mmu_tc >> 20) & 0xf;  /* PS: bits 23-20 */
+	int is = (m68ki_cpu.mmu_tc >> 16) & 0xf;        /* IS: bits 19-16 */
 	int bitpos = 12;
 	int resolved = 0;
 	int pageshift = is;
@@ -1444,12 +1444,12 @@ static void m68851_pmove_put(uint32 ea, uint16 modes)
 			if (tc_val & 0x80000000)
 			{
 				/* Validate TC: IS + TIA + TIB + TIC + TID + PS must equal 32 */
-				uint ps  = (tc_val >> 24) & 0x0F;
-				uint is  = (tc_val >> 20) & 0x0F;
-				uint tia = (tc_val >> 16) & 0x0F;
-				uint tib = (tc_val >> 12) & 0x0F;
-				uint tic = (tc_val >> 8)  & 0x0F;
-				uint tid = (tc_val >> 4)  & 0x0F;
+				uint ps  = (tc_val >> 20) & 0x0F;  /* bits 23-20 */
+				uint is  = (tc_val >> 16) & 0x0F;  /* bits 19-16 */
+				uint tia = (tc_val >> 12) & 0x0F;  /* bits 15-12 */
+				uint tib = (tc_val >> 8)  & 0x0F;  /* bits 11-8 */
+				uint tic = (tc_val >> 4)  & 0x0F;  /* bits 7-4 */
+				uint tid = tc_val & 0x0F;          /* bits 3-0 */
 
 				/* PS must be 8-15 (256B to 32KB pages), and sum must equal 32 */
 				if (ps < 8 || is + tia + tib + tic + tid + ps != 32)
