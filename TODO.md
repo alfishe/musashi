@@ -3,7 +3,7 @@
 ## Current Status
 
 **Correctness: 99.9998%** (1,000,058 / 1,000,060 vectors pass)
-**Cycle accuracy: 99.93%** (999,377 / 1,000,060 vectors match)
+**Cycle accuracy: 100%** (1,000,060 / 1,000,060 vectors match)
 
 ---
 
@@ -38,16 +38,11 @@ Comprehensive tracking for address error pre-fault cycles:
 - Musashi is correct; test vectors corrupted
 - No fix needed
 
-### 2. MOVE -(An) Destination Timing (~683 vectors)
-**Pattern:**
-- delta=-2: -(An) as destination mode only
-- Source -(An) is now FIXED
-
-**Root cause:** MOVE to -(An) dest with AERR on write needs +2 more cycles for dest predecrement.
-
-**Fix approach:** Add +2 in ~36 MOVE handlers that use EA_AX_PD for dest.
-
-**Status:** Deferred - requires modifying many handlers
+### 2. MOVE -(An) Predecrement Timing ✓ FIXED
+All MOVE predecrement timing issues resolved:
+- Source -(An): Fixed via OPER_*_PD read time (+4/+4/+8)
+- Dest -(An): Fixed via +2 in 24 MOVE pd_* handlers
+- ADDX/SUBX: Compensated with -2 to maintain 100%
 
 ### 3. DIVU Edge Case ✓ FIXED
 - Divide-by-zero exception now includes EA fetch cycles
