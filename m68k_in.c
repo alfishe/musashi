@@ -1767,6 +1767,7 @@ M68KMAKE_OP(addx, 32, mm, .)
 	m68ki_check_address_error_010_less(AY, MODE_READ, FLAG_S | m68ki_get_address_space());
 	AY -= 2;
 	uint src = m68ki_read_32(AY);
+	m68ki_aerr_cycles += 6;  /* Source read + additional overhead */
 
 	m68ki_aerr_cycles += 2;  /* Dest predecrement overhead */
 	AX -= 2;
@@ -10905,6 +10906,7 @@ M68KMAKE_OP(subx, 32, mm, .)
 	m68ki_check_address_error_010_less(AY, MODE_READ, FLAG_S | m68ki_get_address_space());
 	AY -= 2;
 	uint src = m68ki_read_32(AY);
+	m68ki_aerr_cycles += 6;  /* Source read + additional overhead */
 
 	m68ki_aerr_cycles += 2;  /* Dest predecrement overhead */
 	AX -= 2;
